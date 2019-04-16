@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3  05apr2019}{...}
+{* *! version 0.3  16apr2019}{...}
 {viewerjumpto "Syntax" "h_index##syntax"}{...}
 {viewerjumpto "Description" "h_index##description"}{...}
 {viewerjumpto "Options" "h_index##options"}{...}
