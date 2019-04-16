@@ -129,7 +129,6 @@ program h_index
 					g select_var=`diligence_corr'*h_0_std+sqrt(1-`diligence_corr'^2)*rnormal()
 					local diligence_share_100=100-(`diligence_share'*100)
 					centile select_var, centile(`diligence_share_100')
-pause
 					keep if select_var>r(c_1)
 					drop select_var
 				}
