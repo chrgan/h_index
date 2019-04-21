@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3  16apr2019}{...}
+{* *! version 0.4  21apr2019}{...}
 {viewerjumpto "Syntax" "h_index##syntax"}{...}
 {viewerjumpto "Description" "h_index##description"}{...}
 {viewerjumpto "Options" "h_index##options"}{...}
@@ -19,7 +19,7 @@ and (strategic) collaborating on the development of h-index and h-alpha values f
 {cmd:h_index}
 [{cmd:,} {it:options}]
 
-{synoptset 35 tabbed}{...}
+{synoptset 40 tabbed}{...}
 {synopthdr}
 {synoptline}
 {syntab:Main}
@@ -27,7 +27,8 @@ and (strategic) collaborating on the development of h-index and h-alpha values f
 {synopt :{opt n(#)}}create # agents per simulation{p_end}
 {synopt :{opt co:authors(#)}}average team size of collaborating co-authors{p_end}
 {synopt :{opt per:iods(#)}}let agents collaborate across {it:p} periods {p_end}
-{synopt :{opt dp:apers(distribution_options)}}initial distribution of papers which have been published by agents (before simulation starts){p_end}
+{synopt :{opt dp:apers(distribution_options)}}initial distribution of papers 
+which have been published by agents (before simulation of collaboration starts){p_end}
 {synopt :{opt sh:arealpha(#)}}share of previously published papers where agents are 
 alpha-authors.{p_end}
 {synopt :{opt dc:itations(distribution_options)}}distribution of citations papers receive in simulation{p_end}
@@ -35,18 +36,15 @@ alpha-authors.{p_end}
 {synopt :{opt sp:eed(#)}}steepness of period function{p_end}
 {synopt :{cmdab:boo:st}([{cmd:}{it:{ul:si}ze(#)}])}boost of citations{it:#}{p_end}
 {synopt :{opt st:rategic}}let agents strategically select co-authors{p_end}
-{synopt :{opt dil:igence(diligence_options)}}share of agents publishing papers each period{p_end}
-{synopt :{opt plot:timefunction}}plot expected values of citations as function of period{p_end}
+{synopt :{opt sel:fcitation}}let agents cite their own papers{p_end}
+{synopt :{cmdab:dil:igence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}])}share of agents publishing papers each period{p_end}
+{synopt :{cmdab:plot:timefunction}[({it:{help twoway_options}})]}plot expected values of citations as function of period{p_end}
 {synopt :{opt clear}}overwrite current data in memory{p_end}
 
 {syntab:distribution_options}
 {synopt :{cmdab:poi:sson} [{cmd:,} {it:{ul:m}ean(#)}]}Poisson with mean {it:#}{p_end}
 {synopt :{cmdab:negb:in} [{cmd:,} {it:{ul:m}ean(#) {ul:d}ispersion(#)}]}negative 
 binomial with mean {it:#} and dispersion {it:#} {p_end}
-
-{syntab:diligence_options}
-{synopt :[{cmd:}{it:{ul:sh}are(#)} {it:{ul:c}orrelation(#)}]}share of agents publishing papers and
-correlation between probability of publishing with initial h-index values{p_end}
 
 {marker description}{...}
 {title:Description}
@@ -124,20 +122,37 @@ If one specifies {it:size(#)} to be .5, this paper receives additional
 {it:round(11*.5) = 6} citations. Default for size is .1.
 
 {phang}
-{opt strategic} by default, the collaborating agents are assigned to
+{opt strategic} By default, the collaborating agents are assigned to
 co-authorships at random. By specifying {opt strategic}, agents with high h-index values avoid co-authorships
 with agents who have equal or higher h-index values. They strategically select co-authors
 to improve their h-alpha-index.
 
 {phang}
-{opt diligence(diligence_options)} by default, every agent is assigned to co-authorships
+{opt selfcitation} When this option is set, a paper gets one additional citation if
+at least one of its authors has a h index which exceeds the number of previous
+citations of the paper by one or two. This reflects agents strategically citing 
+their own papers with citations just below their h index to accelerate the growth of
+thei h index.
+
+{phang}
+{opt diligence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}]) By default, every agent is assigned to co-authorships
 every period. By specifying {opt diligence()}, a lower share of agents publishing papers
 can be set. The probability of publishing a paper in a given period is random by default, however, 
-its correlation with the initial h-index can be set.
+its correlation with the initial h-index can be set. {it:share(#)} with {it:0<#<=1}
+	 specifies the share of agents publishing a new paper each period. {it:correlation(#)}
+	 with {it:0<#<=1} specifies the correlation between the probability of publishing a paper
+	 with the initial h-index value. Thus, one can specify that agents with high 
+	 initial h-index values are more productive in general.
 
 {phang}
 {opt plottimefunction} produces a graph showing the expected citation values
-as a function of periods as specified by {opt peak(#)} and {opt speed(#)}.
+as a function of periods as specified by {opt peak(#)} and {opt speed(#)}. If you
+specify {opt plottimefunction} (without brackets), the x axis will range from 0 to 
+the number of periods specified by {opt periods(#)} and preset titles for the 
+axes will be used. You can alter this by specifying {opt plottimefunction(twoway_options)}, 
+which allows for all {help twoway_options}. When using {opt plottimefunction(twoway_options)},
+at least one twoway option has to be specified, otherwise no graph will appear. Especially, 
+you should specifiy {opt range(# #)}, see {help twoway function}.
 
 {phang}
 {opt clear} forces h_index to run even though the dataset has changed since it was 
@@ -157,15 +172,6 @@ For example, if one specifies {cmd: negbin, mean(3) dispersion(2)}, the expected
 {help rnbinomial()} are calculated from mean() and dispersion(). The default for 
 {it:mean} is 2, the default for {it:dispersion} is 1.1. {it:dispersion(#)} must 
 be greater than 1.
-
-{dlgtab:diligence_options}
-
-{phang}
-    [{cmd:}{it:{ul:sh}are(#)} {it:{ul:c}orrelation(#)}] {it:share(#)} with {it:0<#<=1}
-	 specifies the share of agents publishing a new paper each period. {it:correlation(#)}
-	 with {it:0<#<=1} specifies the correlation between the probability of publishing a paper
-	 with the initial h-index value. Thus, one can specify that agents with high 
-	 initial h-index values are more productive in general. 
 	 
 {marker examples}{...}
 {title:Examples}

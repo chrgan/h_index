@@ -1,18 +1,20 @@
 program h_index
 	version 15.1
-	syntax [, Runs(integer 1) 	/// repeat simulation r times
-		n(integer 100) 			/// number of scientists
-		COauthors(real 5) 		/// average team size
-		PERiods(integer 20) 		/// how often scientists collaborate
-		DPapers(string) 			/// initial distribution of papers
-		SHarealpha(real .33)		/// share of initial papers where author is Alpha-Author
-		DCitations(string) 		/// distribution of citations of new papers
-		Peak(integer 3)			/// Peak of citations
-		SPeed(real 2)				/// Kurtosis of distribution of citations
-		BOOst(string)				/// Merton effect
-		STrategic 					/// strategic selection of team members
-		DILigence(string) 		/// share of scientists who write papers at each round
-		PLOTtimefunction			/// Plot expected value of citations and time
+	syntax [, Runs(integer 1) 			/// repeat simulation r times
+		n(integer 100) 					/// number of scientists
+		COauthors(real 5) 				/// average team size
+		PERiods(integer 20) 				/// how often scientists collaborate
+		DPapers(string) 					/// initial distribution of papers
+		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
+		DCitations(string) 				/// distribution of citations of new papers
+		Peak(integer 3)					/// Peak of citations
+		SPeed(real 2)						/// Kurtosis of distribution of citations
+		BOOst(string)						/// Merton effect
+		STrategic 							/// strategic selection of team members
+		SELfcitation						/// cite papers with citations 1 below h
+		DILigence(string) 				/// share of scientists who write papers at each round
+		PLOTtimefunctionone(string)	/// Plot expected value of citations and time
+		PLOTtimefunctiontwo				/// second option for plotting without twowayoptions
 		CLEAR] 						// run simulation even if data in memory was not saved
 	if "`clear'"=="" { // check for unsaved data
 		quietly describe
@@ -50,10 +52,16 @@ program h_index
 		//parse option for merton effect
 		subprog_merton, `boost'
 		local size=`s(size)'
-		if "`plottimefunction'" != "" {
-			twoway function y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
+		if "`plottimefunctionone'" != "" {
+			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
+				((1+(x/`alpha')^`speed')^2)), `plottimefunctionone'
+			
+		}
+		if "`plottimefunctiontwo'" != "" {
+			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
 				((1+(x/`alpha')^`speed')^2)), ///
-				range(0 `periods') xti("Time") yti("Expected value of citations")
+				range(0 `periods') xti("Period") yti("Expected value of citations")
+			
 		}
 		//simulation starts here
 		local obs=0 //needed to keep track of number of obs
@@ -132,6 +140,7 @@ program h_index
 					keep if select_var>r(c_1)
 					drop select_var
 				}
+				mark written
 				//number of teams depends on desired average team size
 				local number_of_teams=_N/(`coauthors'-1)
 				//strategic selection of team members?
@@ -152,7 +161,7 @@ program h_index
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
 				use `scient', clear
-				append using `publ', keep(scientist paper_id alpha merton_bonus)
+				append using `publ', keep(scientist paper_id alpha merton_bonus written)
 				replace age_paper=age_paper+1 if age_paper!=.a
 				replace age_paper=1 if age_paper==.
 				replace citations=0 if citations==.
@@ -174,7 +183,15 @@ program h_index
 				if "`boost'"!="" {
 					replace citations=citations+merton_bonus if merton_bonus<.
 				}
-				drop merton_bonus
+				if "`selfcitation'"!="" {
+					sort scientist written
+					by scientist: replace written=written[1]
+					replace citations=citations+1 if ///
+						(citations==h_`prec_year'-1 | citations==h_`prec_year'-2) & written==1
+					gsort paper_id -citations
+					by paper_id: replace citations=citations[1]
+				}
+				drop merton_bonus written
 				capture drop E p n
 				//calculate new h-index
 				gsort scientist -citations paper_id
@@ -259,6 +276,12 @@ program subprog_merton, sclass
 	syntax [, SIze(real .1)]
 	sreturn local size `size'
 end
+
+program subprog_plottimefunction
+	syntax anything(equalok) [, * ]
+	twoway function `anything', `options'
+end
+	
 
 //mata function for initial setup of scientists
 version 15.1
