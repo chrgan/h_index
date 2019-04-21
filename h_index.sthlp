@@ -142,7 +142,9 @@ its correlation with the initial h-index can be set. {it:share(#)} with {it:0<#<
 	 specifies the share of agents publishing a new paper each period. {it:correlation(#)}
 	 with {it:0<#<=1} specifies the correlation between the probability of publishing a paper
 	 with the initial h-index value. Thus, one can specify that agents with high 
-	 initial h-index values are more productive in general.
+	 initial h-index values are more productive in general. Default for {it:share(#)} is 1;
+	 for {it:corr(#)} the default is 0. Therefore, not specifying {it:share(#)}
+	 is equivalent to not setting {opt diligence()} at all.
 
 {phang}
 {opt plottimefunction} produces a graph showing the expected citation values
@@ -223,4 +225,5 @@ Hirsch, J. E. (2019). Ha: An index to quantify an individual's scientific leader
 {title:Author}
 
 {pstd}
-Christian Ganser, LMU Munich, christian.ganser@lmu.de{p_end}
+Christian Ganser, LMU Munich, christian.ganser@lmu.de. Developed in (you guessed it) collaboration 
+with Lutz Bornmann and Alexander Tekles.{p_end}

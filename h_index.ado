@@ -1,20 +1,20 @@
 program h_index
 	version 15.1
-	syntax [, Runs(integer 1) 			/// repeat simulation r times
-		n(integer 100) 					/// number of scientists
-		COauthors(real 5) 				/// average team size
-		PERiods(integer 20) 				/// how often scientists collaborate
-		DPapers(string) 					/// initial distribution of papers
-		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
-		DCitations(string) 				/// distribution of citations of new papers
-		Peak(integer 3)					/// Peak of citations
-		SPeed(real 2)						/// Kurtosis of distribution of citations
-		BOOst(string)						/// Merton effect
-		STrategic 							/// strategic selection of team members
-		SELfcitation						/// cite papers with citations 1 below h
-		DILigence(string) 				/// share of scientists who write papers at each round
+	syntax [, Runs(integer 1) 		/// repeat simulation r times
+		n(integer 100) 				/// number of scientists
+		COauthors(real 5) 			/// average team size
+		PERiods(integer 20) 		/// how often scientists collaborate
+		DPapers(string) 			/// initial distribution of papers
+		SHarealpha(real .33)		/// share of initial papers where author is Alpha-Author
+		DCitations(string) 			/// distribution of citations of new papers
+		Peak(integer 3)				/// Peak of citations
+		SPeed(real 2)				/// Kurtosis of distribution of citations
+		BOOst(string)				/// Merton effect
+		STrategic 					/// strategic selection of team members
+		SELfcitation				/// cite papers with citations 1 below h
+		DILigence(string) 			/// share of scientists who write papers at each round
 		PLOTtimefunctionone(string)	/// Plot expected value of citations and time
-		PLOTtimefunctiontwo				/// second option for plotting without twowayoptions
+		PLOTtimefunctiontwo			/// second option for plotting without twowayoptions
 		CLEAR] 						// run simulation even if data in memory was not saved
 	if "`clear'"=="" { // check for unsaved data
 		quietly describe
@@ -26,10 +26,14 @@ program h_index
 		di as error "average teamsize has to be greater than 1"
 		exit
 	}
+	if `sharealpha'<0 | `sharealpha'>1 {
+		di as error "share() has to be >=0 and <=1"
+		exit
+	}
 	quietly {
 		//parse distribution options for papers
 		local dpapers = subinstr("`dpapers'", ",", "", 1)
-		subprog_distributions, `dpapers'
+		noi subprog_distributions, `dpapers'
 		local d_papers "`s(dist)'"
 		local dpm `s(mean)'	
 		local dpd `s(dispersion)'
@@ -37,7 +41,7 @@ program h_index
 		local dpn=(`dpm'*`dpp')/(1-`dpp')
 		//parse distribution options for citations of new papers
 		local dcitations = subinstr("`dcitations'", ",", "", 1)
-		subprog_distributions, `dcitations'
+		noi subprog_distributions, `dcitations'
 		local d_citations "`s(dist)'"
 		local dcm `s(mean)'	
 		local dcd `s(dispersion)'
@@ -242,12 +246,19 @@ end
 program subprog_distributions, sclass
 	syntax [, POIsson NEGBin ///
 		Mean(integer 2) Dispersion(real 1.1)]
+	if ("`poisson'"!="" & `dispersion'!=1.1) {
+		di as text "note: dispersion() specified, but using poisson. dispersion() ignored, perhaps you wanted to use negbin()?"
+	}
 	if (("`poisson'"!="")+("`negbin'"!=""))>1 {
 		di as err "too many distributions specified"
 		error 197
 	}
 	if ("`negbin'"!="" & (`dispersion'<=1)) {
 		di as err "dispersion has to be greater than 1"
+		error 197
+	}
+	if (`mean'<1) {
+		di as err "mean has to be >= 1"
 		error 197
 	}
 	else if ((("`poisson'"!="")+("`negbin'"!=""))==0) | ///
