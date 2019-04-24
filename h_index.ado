@@ -7,6 +7,7 @@ program h_index
 		DPapers(string) 					/// initial distribution of papers
 		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
 		DCitations(string) 				/// distribution of citations of new papers
+		UPdate								/// update alpha author
 		Peak(integer 3)					/// Peak of citations
 		SPeed(real 2)						/// Kurtosis of distribution of citations
 		BOOst(string)						/// Merton effect
@@ -142,7 +143,7 @@ program h_index
 					keep if select_var>r(c_1)
 					drop select_var
 				}
-				mark written
+				mark written //necessary for self citations
 				//number of teams depends on desired average team size
 				local number_of_teams=_N/(`coauthors'-1)
 				//strategic selection of team members?
@@ -154,17 +155,20 @@ program h_index
 				else {
 					g paper_id=runiformint(1,`number_of_teams') //team-number
 				}
-				sort paper_id scientist
-				by paper_id: egen maxh=max(h_`prec_year') //identify alpha-author of each team
-				g alpha=h_`prec_year'==maxh
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
 				use `scient', clear
-				append using `publ', keep(scientist paper_id alpha written maxh)
+				append using `publ', keep(scientist paper_id written )
 				replace age_paper=age_paper+1 if age_paper!=.a
 				replace age_paper=1 if age_paper==.
 				replace citations=0 if citations==.
+				sort scientist h_`prec_year'
+				by scientist: replace h_`prec_year'=h_`prec_year'[1]
+				sort paper_id scientist
+				by paper_id: egen maxh2=max(h_`prec_year') //identify alpha-author of each team
+				replace maxh=maxh2 if maxh==. & citations!=.a
+				replace alpha=h_`prec_year'==maxh if alpha==.
 				//new citations for papers
 				if (`d_citations'==1) {
 					replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
@@ -205,6 +209,12 @@ program h_index
 				g alpha_core=alpha==1 & core==1
 				by scientist: egen h_alpha_`year'=total(alpha_core)
 				drop r a number_cit core alpha_core
+				if "`update'"!="" { //reset maxh and alpha to missing
+											//if alpha author is updated every period
+					replace maxh=. if h_alpha_0==.
+					replace alpha=. if h_alpha_0==.
+				}
+				drop maxh2
 				save `scient', replace
 			}
 			g run=`run'

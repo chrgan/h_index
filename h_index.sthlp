@@ -32,6 +32,7 @@ which have been published by agents (before simulation of collaboration starts){
 {synopt :{opt sh:arealpha(#)}}share of previously published papers where agents are 
 alpha-authors.{p_end}
 {synopt :{opt dc:itations(distribution_options)}}distribution of citations papers receive in simulation{p_end}
+{synopt :{opt up:date}}Update alpha author each period{p_end}
 {synopt :{opt p:eak(#)}}period when number of citations reaches its maximum{p_end}
 {synopt :{opt sp:eed(#)}}steepness of period function{p_end}
 {synopt :{cmdab:boo:st}([{cmd:}{it:{ul:si}ze(#)}])}boost of citations{it:#}{p_end}
@@ -103,6 +104,11 @@ papers receive. The expected value of citations is assumed to follow a log-logis
 function of time. {opt dcitations()} specifies the expected value of the
 distribution of citations at the time when citations reach their maximum 
 (see {opt peak()}). Before and after the peak, the expected value of the citation distribution is always lower.
+
+{phang}
+{opt update} specifies that the alpha author of newly written papers is determined 
+every period based on the current h values of its authors. Without this option,
+the alpha author is determined when the paper is written and held constant from then on.
 
 {phang}
 {opt peak(#)} specifies when the expected value of the citation distribution 
