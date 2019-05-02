@@ -1,6 +1,6 @@
-v 2.4
+v 2.4.1
 d h_index. simulation of collaborating scientists
 d C. Ganser, LMU Munich
-d Distribution-Date: 20190424
+d Distribution-Date: 20190502
 f h_index.ado
 f h_index.sthlp

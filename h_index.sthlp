@@ -8,7 +8,7 @@
 {viewerjumpto "Author" "h_index##author"}{...}
 {p2colset 1 15 17 2}{...}
 {p2col:{bf:h_index} {hline 2}}Simulate the effect of publishing, being cited, 
-and (strategic) collaborating on the development of h-index and h-alpha values for a specified set of agents.{p_end}
+and (strategic) collaborating on the development of h-index and h-alpha index values for a specified set of agents.{p_end}
 {p2colreset}{...}
 
 
@@ -25,17 +25,17 @@ and (strategic) collaborating on the development of h-index and h-alpha values f
 {syntab:Main}
 {synopt :{opt r:uns(#)}}repeat simulation # times{p_end}
 {synopt :{opt n(#)}}create # agents per simulation{p_end}
-{synopt :{opt co:authors(#)}}average team size of collaborating co-authors{p_end}
+{synopt :{opt co:authors(#)}}average number of collaborating co-authors{p_end}
 {synopt :{opt per:iods(#)}}let agents collaborate across {it:p} periods {p_end}
 {synopt :{opt dp:apers(distribution_options)}}initial distribution of papers 
-which have been published by agents (before simulation of collaboration starts){p_end}
+which have been published by agents{p_end}
 {synopt :{opt sh:arealpha(#)}}share of previously published papers where agents are 
 alpha-authors.{p_end}
 {synopt :{opt dc:itations(distribution_options)}}distribution of citations papers receive in simulation{p_end}
-{synopt :{opt up:date}}Update alpha author each period{p_end}
+{synopt :{opt up:date}}update alpha authors each period{p_end}
 {synopt :{opt p:eak(#)}}period when number of citations reaches its maximum{p_end}
 {synopt :{opt sp:eed(#)}}steepness of period function{p_end}
-{synopt :{cmdab:boo:st}([{cmd:}{it:{ul:si}ze(#)}])}boost of citations{it:#}{p_end}
+{synopt :{cmdab:boo:st}([{cmd:}{it:{ul:si}ze(#)}])}boost of citations by cumulative advantage effects{p_end}
 {synopt :{opt st:rategic}}let agents strategically select co-authors{p_end}
 {synopt :{opt sel:fcitation}}let agents cite their own papers{p_end}
 {synopt :{cmdab:dil:igence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}])}share of agents publishing papers each period{p_end}
@@ -71,7 +71,8 @@ h_index produces a dataset containing the following variables:
 
 {pstd}
 If one is interested in reproducing results, one should first set the
-random-number seed; see {manhelp set_seed R:set seed}.
+random-number seed; see {manhelp set_seed R:set seed}. 
+The package {net "describe moremata, from(http://fmwww.bc.edu/RePEc/bocode/m)":moremata} must be installed.
 
 {marker options}{...}
 {title:Options}
@@ -106,9 +107,9 @@ distribution of citations at the time when citations reach their maximum
 (see {opt peak()}). Before and after the peak, the expected value of the citation distribution is always lower.
 
 {phang}
-{opt update} specifies that the alpha author of newly written papers is determined 
+{opt update} specifies that the alpha author of new papers is determined 
 every period based on the current h values of its authors. Without this option,
-the alpha author is determined when the paper is written and held constant from then on.
+the alpha author is determined when the paper has been published and held constant from then on.
 
 {phang}
 {opt peak(#)} specifies when the expected value of the citation distribution 
@@ -116,14 +117,15 @@ reaches its maximum. Default is 3.
 
 {phang}
 {opt speed(#)} specifies the steepness of the log-logistic time function of the expected
-citations values. The higher {it:speed(#)}, the steeper the function. Default is 2. 
+citation values. The higher {it:speed(#)}, the steeper the function. Default is 2. 
 
 {phang}
 {opt boost}([{cmd:}{it:{ul:si}ze(#)}]) specifies a "boost" effect: 
-papers of agents with higher h-index values are cited more frequently than papers of agents with lower h-index values. For every additional h 
-point of an agent's paper who has the highest h-index among all agents, citations 
+papers of agents with higher h-index values are cited more frequently than papers of 
+agents with lower h-index values (heading: cumulative advantage). For every additional h 
+point of an agent's papers who has the highest h-index among all agents, citations 
 are increased by the number specified with {it:size(#)}, rounded to the next 
-integer. For example, consider a single paper where the highest h-index of its agents is 11.
+integer. For example, suppose a single paper where the highest h-index of its agents is 11.
 If one specifies {it:size(#)} to be .5, this paper receives additional 
 {it:round(11*.5) = 6} citations. Default for size is .1.
 
@@ -138,7 +140,7 @@ to improve their h-alpha-index.
 at least one of its authors has a h index which exceeds the number of previous
 citations of the paper by one or two. This reflects agents strategically citing 
 their own papers with citations just below their h index to accelerate the growth of
-thei h index.
+their h index.
 
 {phang}
 {opt diligence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}]) By default, every agent is assigned to co-authorships
@@ -167,8 +169,8 @@ last saved.
 {dlgtab:distribution_options}
 
 {phang}
-{opt poisson} [{cmd:,} {it:{ul:m}ean(#)}] Poisson distributin with mean {it:#}. 
-See {help rpoisson()}. This is the default if no option is specified. Default for {it:mean} is 2.
+{opt poisson} [{cmd:,} {it:{ul:m}ean(#)}] Poisson distribution with mean {it:#}. 
+See {help rpoisson()}. This distribution is the default if no option is specified. Default for {it:mean} is 2.
 
 {phang}
 {opt negbin} [{cmd:,} {it:{ul:m}ean(#) {ul:d}ispersion(#)}] negative binomial distribution with parameters 
@@ -225,8 +227,18 @@ Hirsch, J. E. (2005). An index to quantify an individual's scientific research o
 {pstd}
 Hirsch, J. E. (2019). Ha: An index to quantify an individual's scientific leadership. Scientometrics, 118(2), 673–686.{p_end}
 
+{pstd}
+Jann, B. 2005. moremata: Stata module (Mata) to provide various functions.
+Available from http://ideas.repec.org/c/boc/bocode/s455001.html.{p_end}
+
+
 {marker author}{...}
 {title:Author}
 
 {pstd}
-Christian Ganser, LMU Munich, christian.ganser@lmu.de{p_end}
+Christian Ganser(*), christian.ganser@lmu.de, in collaboration with 
+Lutz Bornmann(+) and Alexander Tekles(*,+){p_end}
+
+{pstd}
+*Ludwig-Maximilians-Universität Munich, Department of Sociology{break}
++Division for Science and Innovation Studies, Administrative Headquarters of the Max Planck Society{p_end}
