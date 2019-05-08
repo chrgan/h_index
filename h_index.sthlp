@@ -159,8 +159,7 @@ specify {opt plottimefunction} (without brackets), the x axis will range from 0 
 the number of periods specified by {opt periods(#)} and preset titles for the 
 axes will be used. You can alter this by specifying {opt plottimefunction(twoway_options)}, 
 which allows for all {help twoway_options}. When using {opt plottimefunction(twoway_options)},
-at least one twoway option has to be specified, otherwise no graph will appear. Especially, 
-you should specifiy {opt range(# #)}, see {help twoway function}.
+at least one twoway option has to be specified, otherwise no graph will appear. Also see {help twoway function}.
 
 {phang}
 {opt clear} forces h_index to run even though the dataset has changed since it was 

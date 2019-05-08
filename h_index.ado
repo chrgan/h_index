@@ -55,7 +55,8 @@ program h_index
 		local size=`s(size)'
 		if "`plottimefunctionone'" != "" {
 			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
-				((1+(x/`alpha')^`speed')^2)), `plottimefunctionone'
+				((1+(x/`alpha')^`speed')^2)), ///
+				range(0 `periods') xti("Period") yti("Expected value of citations") `plottimefunctionone'
 			
 		}
 		if "`plottimefunctiontwo'" != "" {
