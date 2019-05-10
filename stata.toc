@@ -1,3 +1,0 @@
-v 2.4.2
-d Christian Ganser, LMU Munich
-p h_index simulation of collaborating scientists
