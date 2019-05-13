@@ -301,10 +301,7 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 	real scalar dpn, real scalar dpp)
 {
 	//create N scientists and number them
-	S=J(n,1,.)
-	for (i=1; i<=rows(S); i++) {
-		S[i,1]=i
-	}
+	S=J(1,1,1::n)
 	//random number of papers per scientist
 	if (d_papers==1) {
 		P=rpoisson(n,1,mdp) //poisson distribution
