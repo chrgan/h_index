@@ -73,11 +73,9 @@ program h_index
 			clear
 			tempfile publ scient
 			//create set of N scientists with k papers
-			mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp')
+			mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp',`sharealpha')
 			//no of papers can be 0, hence no age
 			replace age_paper=.a if no_paper_start==0
-			//make 1/3 of the papers alpha-paper
-			g alpha=runiform()<`sharealpha'
 			//citations
 			g citations=0
 			forvalues age=1/5 {
@@ -86,10 +84,11 @@ program h_index
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
 				}	
 				else if `d_citations'==3 {
-					g E_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
-						((1+(`age'/`alpha')^`speed')^2)))
-					g p_`age'=E_`age'/(E_`age'*`dcd')
-					g n_`age'=(E_`age'*p_`age')/(1-p_`age')
+					g p_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
+						((1+(`age'/`alpha')^`speed')^2)))/((`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
+						((1+(`age'/`alpha')^`speed')^2)))*`dcd')
+					g n_`age'=((`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
+						((1+(`age'/`alpha')^`speed')^2)))*p_`age')/(1-p_`age')
 					g cit_`age'=rnbinomial(n_`age',p_`age')
 				}
 			}
@@ -100,7 +99,7 @@ program h_index
 			}
 			drop cit_*
 			replace citations=.a if age_paper==.a
-			capture drop E_* p_* n_*
+			capture drop p_* n_*
 			//calculate h
 			gsort scientist -citations paper_id
 			by scientist: g r=_n //order of papers by desc. no of citations
@@ -177,11 +176,13 @@ program h_index
 				}
 
 				else if (`d_citations'==3) {
-					g E=(`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
-						((1+(age_paper/`alpha')^`speed')^2)))
-					g p=E/(E*`dcd')
-					g n=(E*p)/(1-p)
+					g p=(`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
+						((1+(age_paper/`alpha')^`speed')^2)))/((`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
+						((1+(age_paper/`alpha')^`speed')^2)))*`dcd')
+					g n=((`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
+						((1+(age_paper/`alpha')^`speed')^2)))*p)/(1-p)
 					replace citations = citations+rnbinomial(n,p) if age_paper!=.a
+					drop p n
 				}
 				sort paper_id, stable
 				by paper_id: replace citations=citations[1]
@@ -197,7 +198,6 @@ program h_index
 					by paper_id: replace citations=citations[1]
 				}
 				drop written
-				capture drop E p n
 				//calculate new h-index
 				gsort scientist -citations paper_id
 				by scientist: g r=_n
@@ -298,28 +298,21 @@ end
 version 15.1
 mata:
 void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
-	real scalar dpn, real scalar dpp)
+	real scalar dpn, real scalar dpp, real scalar salpha)
 {
-	//create N scientists and number them
-	S=J(1,1,1::n)
-	//random number of papers per scientist
-	if (d_papers==1) {
-		P=rpoisson(n,1,mdp) //poisson distribution
+	//create N scientists, random number of papers per scientist, number scientists
+	if (d_papers==1) { //poisson distribution
+		S=J(1,1,1::n),rpoisson(n,1,mdp)
 	}
-	else if (d_papers==3) {
-		P=rnbinomial(n,1,dpn,dpp) //negative binomial distribution
+	else if (d_papers==3) { //negative binomial distribution
+		S=J(1,1,1::n),rnbinomial(n,1,dpn,dpp)
 	}
 	//expand scientists by their number of papers
-	S=S,P,J(rows(S),1,.)
-	_mm_expand(S,P,1,1)
-	//paper id
-	for (i=1; i<=rows(S); ++i) {
-		S[i,cols(S)]=i
-	}
-	//random age of papers
-	S=S,runiformint(rows(S),1,1,5)
+	_mm_expand(S,S[.,2],1,1)
+	//paper id ,random age of papers, alpha papers
+	S=S,J(1,1,1::rows(S)),runiformint(rows(S),1,1,5),(runiform(rows(S),1):<salpha)
 	//put to stata
-	st_addvar("float", ("scientist","no_paper_start","paper_id","age_paper"))
+	st_addvar("float", ("scientist","no_paper_start","paper_id","age_paper","alpha"))
 	st_addobs(rows(S))
 	st_store(.,.,S)
 }
