@@ -155,7 +155,6 @@ program h_index
 				else {
 					g paper_id=runiformint(1,`number_of_teams') //team-number
 				}
-pause
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
