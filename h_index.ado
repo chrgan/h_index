@@ -145,7 +145,7 @@ program h_index
 				}
 				mark written //necessary for self citations
 				//number of teams depends on desired average team size
-				local number_of_teams=_N/(`coauthors'-1)
+				local number_of_teams=_N/(`coauthors')
 				//strategic selection of team members?
 				if "`strategic'" != "" {
 					gsort -h_`prec_year'
@@ -155,6 +155,7 @@ program h_index
 				else {
 					g paper_id=runiformint(1,`number_of_teams') //team-number
 				}
+pause
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
