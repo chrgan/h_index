@@ -149,7 +149,8 @@ program h_index
 				//strategic selection of team members?
 				if "`strategic'" != "" {
 					gsort -h_`prec_year'
-					g paper_id = _n in 1/`number_of_teams'
+					local number_of_teams_round=round(`number_of_teams')
+					g paper_id = _n in 1/`number_of_teams_round'
 					replace paper_id=runiformint(1,`number_of_teams') if paper_id==.
 				}
 				else {
