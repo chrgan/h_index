@@ -2,15 +2,18 @@ program h_index_dev
 	version 15.1
 	syntax [, Runs(integer 1) 			/// repeat simulation r times
 		n(integer 100) 					/// number of scientists
+		INIT(string)						/// initial setup
 		COauthors(real 5) 				/// average team size
 		PERiods(integer 20) 				/// how often scientists collaborate
-		DPapers(string) 					/// initial distribution of papers
 		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
 		DCitations(string) 				/// distribution of citations of new papers
 		UPdate								/// update alpha author
 		Peak(integer 3)					/// Peak of citations
 		SPeed(real 2)						/// Kurtosis of distribution of citations
 		BOOst(string)						/// Merton effect
+		SUBgroups							/// Agents collaborate within subgropus
+		EXChange(real 0)					/// Rate of exchange between subgroups
+		ADVantage(real 1)					/// Factor by which citations of subgroup 2 exceed those of subgroup 1
 		STrategic 							/// strategic selection of team members
 		SELfcitation						/// cite papers with citations 1 below h
 		DILigence(string) 				/// share of scientists who write papers at each round
@@ -21,13 +24,23 @@ program h_index_dev
 		quietly describe
 		if r(changed)  { 
 			error 4 
-		}
+		}	
 	}
 	if `coauthors'<=1 { //average teamsize has to be >1
 		di as error "average teamsize has to be greater than 1"
 		exit
 	}
 	quietly {
+		//parse options for initial setup
+		*local init = subinstr("`init'", ",", "", 1)
+		subprog_init `init' //FEHLERMELDUNG EINBAUEN, WENN DIE DISTRIBUTION FESTGElEGT WIRD BEI TYPE 2
+		local inittype `s(inittype)'
+		if "`inittype'"=="" {
+			local inittype 1
+		}
+		local dpapers `s(dpapers)'
+		local max_age_scientists `s(maxage)'
+		local dil_init `s(dilinit)'
 		//parse distribution options for papers
 		local dpapers = subinstr("`dpapers'", ",", "", 1)
 		subprog_distributions, `dpapers'
@@ -71,17 +84,28 @@ program h_index_dev
 		forvalues run=1/`runs' { //repeat simulation # times
 			noi di "`run' " _cont //display number of run
 			clear
+			
 			tempfile publ scient
 			//create set of N scientists with k papers
-			mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp')
+			if `inittype'==1 {
+				mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp')
+			}
+			else if `inittype'==2 {
+				mata: scientists2(`n',`max_age_scientists',`dil_init')
+				bys scientist: egen no_paper_start=total(written)
+				drop if written==0 & no_paper_start >0
+				bys scientist: drop if no_paper_start==0 & _n>1
+				g paper_id=_n
+			}
+			pause
 			//no of papers can be 0, hence no age
 			replace age_paper=.a if no_paper_start==0
-			//make 1/3 of the papers alpha-paper
+			//make share of the papers alpha-paper
 			g alpha=runiform()<`sharealpha'
-			bys scientist: egen startage=max(age_paper)
+
 			//citations
 			g citations=0
-			forvalues age=1/5 {
+			forvalues age=1/`max_age_scientists' {
 				if `d_citations'==1 {
 					g cit_`age'=rpoisson(`factor'*(((`speed'/`alpha')* ///
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
@@ -95,7 +119,7 @@ program h_index_dev
 				}
 			}
 			local i=1
-			while `i'<=5 {
+			while `i'<=`max_age_scientists' {
 				replace citations=citations+cit_`i' if age_paper>=`i'
 				local ++i
 			}
@@ -129,6 +153,7 @@ program h_index_dev
 			replace maxh=h_0+runiformint(1,5) if maxh==. & age_paper<.
 			//clean up, save
 			drop r a number_cit core alpha_core
+
 			save `scient', replace
 			//now let scientists collaborate
 			forvalues year=1/`periods' {
@@ -147,21 +172,52 @@ program h_index_dev
 				}
 				mark written //necessary for self citations
 				//number of teams depends on desired average team size
-				local number_of_teams=_N/(`coauthors'-1)
+				local number_of_teams=_N/(`coauthors')
 				//strategic selection of team members?
-				if "`strategic'" != "" {
-					gsort -h_`prec_year'
-					g paper_id = _n in 1/`number_of_teams'
-					replace paper_id=runiformint(1,`number_of_teams') if paper_id==.
+							
+				if "`subgroups'" == "" {
+					if "`strategic'" != "" {
+						gsort -h_`prec_year'
+						local number_of_teams_round=round(`number_of_teams')
+						g paper_id = _n in 1/`number_of_teams_round'
+						replace paper_id=runiformint(1,`number_of_teams') if paper_id==.
+					}
+					else {
+						g paper_id=runiformint(1,`number_of_teams') //team-number
+					}
 				}
-				else {
-					g paper_id=runiformint(1,`number_of_teams') //team-number
+				else if "`subgroups'" != "" {
+					local half=_N/2
+					g half=0 in 1/`half'
+					recode half (.=1)
+					recode half (0=1) (1=0) if runiform()<`exchange'
+					if "`strategic'" != "" {
+						gsort half -h_`prec_year'
+						local number_of_teams_round_half=round((`number_of_teams')/2)
+						g paper_id = _n in 1/`number_of_teams_round_half'
+						local lower=`number_of_teams_round_half'+1
+						replace paper_id=runiformint(1,`number_of_teams_round_half') in `lower'/`half'
+						local lower=`half'+1
+						local upper=`half'+`number_of_teams_round_half'
+						replace paper_id=_n-`half'+`number_of_teams_round_half' in `lower'/`upper'
+						replace paper_id=runiformint(`number_of_teams_round_half'+1,`number_of_teams') if paper_id==.
+					}				
+					else {
+						g paper_id=runiformint(1,(`number_of_teams'/2)) if half==0 //team-number
+						replace paper_id=runiformint(((`number_of_teams'/2)+1),`number_of_teams') if half==1
+					}
 				}
+				
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
 				use `scient', clear
-				append using `publ', keep(scientist paper_id written )
+				if "`subgroups'" != "" {
+					append using `publ', keep(scientist h_0_std paper_id written half)
+				}
+				else {
+					append using `publ', keep(scientist h_0_std paper_id written)
+				}
 				replace age_paper=age_paper+1 if age_paper!=.a
 				replace age_paper=1 if age_paper==.
 				replace citations=0 if citations==.
@@ -183,6 +239,9 @@ program h_index_dev
 					g p=E/(E*`dcd')
 					g n=(E*p)/(1-p)
 					replace citations = citations+rnbinomial(n,p) if age_paper!=.a
+				}
+				if "`subgroups'" != "" {
+					replace citations = citations*`advantage' if half==1
 				}
 				sort paper_id, stable
 				by paper_id: replace citations=citations[1]
@@ -244,7 +303,16 @@ program h_index_dev
 		mata: st_store(.,names,final_data)
 		//one row per scientist
 		drop citations alpha h_0_std
-		collapse startage no_paper_start h_*, by(scientist run)
+		if `inittype'==1 {
+			collapse no_paper_start h_*, by(scientist run)
+		}
+		else if `inittype'==2 {
+			collapse age_scientist no_paper_start h_*, by(scientist run)
+		}
+		if "`subgroups'" != "" {
+			g subgroup=1 if scientist <= `n'/2
+			recode subgroup (.=2)
+		}
 		compress
 	}
 end
@@ -272,6 +340,14 @@ program subprog_distributions, sclass
 	sreturn local dist "`dist'"
 	sreturn local mean `mean'
 	sreturn local dispersion `dispersion'
+end
+
+program subprog_init, sclass
+	syntax [anything] [, DPapers(string) MAXAge(integer 5) DILINit(real .8)]
+	sreturn local inittype `anything'
+	sreturn local dpapers "`dpapers'"
+	sreturn local maxage `maxage'
+	sreturn local dilinit `dilinit'
 end
 
 program subprog_diligence, sclass
@@ -302,10 +378,7 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 	real scalar dpn, real scalar dpp)
 {
 	//create N scientists and number them
-	S=J(n,1,.)
-	for (i=1; i<=rows(S); i++) {
-		S[i,1]=i
-	}
+	S=J(1,1,1::n)
 	//random number of papers per scientist
 	if (d_papers==1) {
 		P=rpoisson(n,1,mdp) //poisson distribution
@@ -314,16 +387,30 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 		P=rnbinomial(n,1,dpn,dpp) //negative binomial distribution
 	}
 	//expand scientists by their number of papers
-	S=S,P,J(rows(S),1,.)
+	S=S,P,J(rows(S),2,.)
 	_mm_expand(S,P,1,1)
-	//paper id
+	//paper id, random age of papers
 	for (i=1; i<=rows(S); ++i) {
-		S[i,cols(S)]=i
+		S[i,(cols(S)-1)]=i
+		S[i,cols(S)]=runiformint(1,1,1,S[i,2])
 	}
-	//random age of papers
-	S=S,runiformint(rows(S),1,1,5)
 	//put to stata
 	st_addvar("float", ("scientist","no_paper_start","paper_id","age_paper"))
+	st_addobs(rows(S))
+	st_store(.,.,S)
+}
+
+void function scientists2(real scalar n, real scalar max_age_scientists,
+	real scalar dil_init)
+{
+	//create N scientists with random age
+	S=J(1,1,1::n),runiformint(n,1,1,max_age_scientists),J(n,1,1)
+	_mm_expand(S,S[.,2],1,1)
+	for (i=2; i<=rows(S); i++) {
+		if (S[i,1]==S[(i-1),1]) S[i,3]=S[(i-1),3]+1
+	}
+	S=S,(runiform(rows(S),1):<=dil_init)
+	st_addvar("float", ("scientist","age_scientist","age_paper","written"))
 	st_addobs(rows(S))
 	st_store(.,.,S)
 }
