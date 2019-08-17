@@ -350,13 +350,15 @@ program h_index_dev
 			local p0=`p'-1
 			replace top_`p'=top_`p'+top_`p0'
 		}
-		//compute top papers age standardized
-		forvalues per=0/`periods' {
-			g top_`per'_std=top_`per'/(age_scientist_start+`per')
-		}
-		//compute m
-		forvalues per=0/`periods' {
-			g m_`per'=h_`per'/(age_scientist_start+`per')
+		if `inittype'==2 {
+			//compute top papers age standardized
+			forvalues per=0/`periods' {
+				g top_`per'_std=top_`per'/(age_scientist_start+`per')
+			}
+			//compute m
+			forvalues per=0/`periods' {
+				g m_`per'=h_`per'/(age_scientist_start+`per')
+			}
 		}
 		//add variable indicating agent's subgroup
 		if "`subgroups'" != "" {
