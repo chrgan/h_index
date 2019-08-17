@@ -97,7 +97,6 @@ program h_index_dev
 				bys scientist: drop if no_paper_start==0 & _n>1
 				g paper_id=_n
 			}
-			pause
 			//no of papers can be 0, hence no age
 			replace age_paper=.a if no_paper_start==0
 			//make share of the papers alpha-paper
@@ -105,10 +104,14 @@ program h_index_dev
 
 			//citations
 			g citations=0
+			g topstart=0 //variable for number of top papers at beginning
 			forvalues age=1/`max_age_scientists' {
 				if `d_citations'==1 {
 					g cit_`age'=rpoisson(`factor'*(((`speed'/`alpha')* ///
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
+					sum cit_`age', det
+					g toppaper_`age'=cit_`age'>r(p90) & age_paper>=`age'
+					bys scientist: egen top_`age'=total(toppaper_`age')
 				}	
 				else if `d_citations'==3 {
 					g E_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
@@ -116,16 +119,22 @@ program h_index_dev
 					g p_`age'=E_`age'/(E_`age'*`dcd')
 					g n_`age'=(E_`age'*p_`age')/(1-p_`age')
 					g cit_`age'=rnbinomial(n_`age',p_`age')
+					sum cit_`age', det
+					g toppaper_`age'=cit_`age'>r(p90) & age_paper>=`age'
+					bys scientist: egen top_`age'=total(toppaper_`age')	
 				}
-			}
+			}		
 			local i=1
 			while `i'<=`max_age_scientists' {
 				replace citations=citations+cit_`i' if age_paper>=`i'
+				replace topstart=topstart+top_`i' 
 				local ++i
 			}
-			drop cit_*
+			drop cit_* top_* toppaper_*
+			ren topstart top_0
 			replace citations=.a if age_paper==.a
 			capture drop E_* p_* n_*
+
 			//calculate h
 			gsort scientist -citations paper_id
 			by scientist: g r=_n //order of papers by desc. no of citations
@@ -152,8 +161,7 @@ program h_index_dev
 			g maxh=h_0 if alpha==1 & age_paper <.
 			replace maxh=h_0+runiformint(1,5) if maxh==. & age_paper<.
 			//clean up, save
-			drop r a number_cit core alpha_core
-
+			drop r a number_cit core alpha_core			
 			save `scient', replace
 			//now let scientists collaborate
 			forvalues year=1/`periods' {
@@ -173,8 +181,8 @@ program h_index_dev
 				mark written //necessary for self citations
 				//number of teams depends on desired average team size
 				local number_of_teams=_N/(`coauthors')
+				
 				//strategic selection of team members?
-							
 				if "`subgroups'" == "" {
 					if "`strategic'" != "" {
 						gsort -h_`prec_year'
@@ -206,8 +214,7 @@ program h_index_dev
 						g paper_id=runiformint(1,(`number_of_teams'/2)) if half==0 //team-number
 						replace paper_id=runiformint(((`number_of_teams'/2)+1),`number_of_teams') if half==1
 					}
-				}
-				
+				}			
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
@@ -229,8 +236,16 @@ program h_index_dev
 				replace alpha=h_`prec_year'==maxh if alpha==.
 				//new citations for papers
 				if (`d_citations'==1) {
-					replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
-						((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))) if age_paper!=.a
+					if "`subgroups'" == "" {
+						replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))) if age_paper!=.a
+					} 
+					else if "`subgroups'" != "" {
+						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2)))) if age_paper!=.a  & half != 1
+						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))))*`advantage' if age_paper!=.a  & half == 1
+					}
 				}
 
 				else if (`d_citations'==3) {
@@ -238,11 +253,15 @@ program h_index_dev
 						((1+(age_paper/`alpha')^`speed')^2)))
 					g p=E/(E*`dcd')
 					g n=(E*p)/(1-p)
-					replace citations = citations+rnbinomial(n,p) if age_paper!=.a
+					if "`subgroups'" == "" {
+						replace citations = citations+rnbinomial(n,p) if age_paper!=.a
+					}
+					else if "`subgroups'" != "" {
+						replace citations = citations+rnbinomial(n,p) if age_paper!=.a & half != 1
+						replace citations = citations+rnbinomial(n,p)*`advantage' if age_paper!=.a & half == 1
+					}
 				}
-				if "`subgroups'" != "" {
-					replace citations = citations*`advantage' if half==1
-				}
+
 				sort paper_id, stable
 				by paper_id: replace citations=citations[1]
 				if "`boost'"!="" {
@@ -258,6 +277,23 @@ program h_index_dev
 				}
 				drop written
 				capture drop E p n
+				//count top 10 papers		
+				if "`subgroups'" == "" {
+					sum cit, det
+					g toppaper=cit>r(p90)
+					bys scientist: egen top_`year'=total(toppaper)
+					drop toppaper
+				}
+				else if "`subgroups'" != "" {
+					sum cit if half==0, det
+					g toppaper=cit>r(p90) & half==0
+					tab toppaper
+					sum cit if half==1, det
+					replace toppaper=1 if cit>r(p90) & half==1
+					bys scientist: egen top_`year'=total(toppaper)
+					drop toppaper
+				}
+				
 				//calculate new h-index
 				gsort scientist -citations paper_id
 				by scientist: g r=_n
@@ -304,11 +340,25 @@ program h_index_dev
 		//one row per scientist
 		drop citations alpha h_0_std
 		if `inittype'==1 {
-			collapse no_paper_start h_*, by(scientist run)
+			collapse no_paper_start h_* top_*, by(scientist run)
 		}
 		else if `inittype'==2 {
-			collapse age_scientist no_paper_start h_*, by(scientist run)
+			collapse age_scientist_start=age_scientist no_paper_start h_* top_*, by(scientist run)
 		}
+		//cumulate top papers over periods
+		forvalues p=1/`periods' {
+			local p0=`p'-1
+			replace top_`p'=top_`p'+top_`p0'
+		}
+		//compute top papers age standardized
+		forvalues per=0/`periods' {
+			g top_`per'_std=top_`per'/(age_scientist_start+`per')
+		}
+		//compute m
+		forvalues per=0/`periods' {
+			g m_`per'=h_`per'/(age_scientist_start+`per')
+		}
+		//add variable indicating agent's subgroup
 		if "`subgroups'" != "" {
 			g subgroup=1 if scientist <= `n'/2
 			recode subgroup (.=2)
@@ -424,5 +474,12 @@ end
 (2) https://www.statalist.org/forums/forum/general-stata-discussion/general/
 1315697-syntax-for-options-within-options
 
+todo
+
+- Produktivitätsvariable
+- Agenten schon im Startwelt in Subgruppen aufteilen
+- Optionen für zu speichernde (besser: zu berechnende) Variablen
+- Top-Paper auf Paper-Alter standardisieren
+(help-file aktualisieren)
 
 
