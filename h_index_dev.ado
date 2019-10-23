@@ -10,8 +10,8 @@ program h_index_dev
 		UPdate								/// update alpha author
 		Peak(integer 3)					/// Peak of citations
 		SPeed(real 2)						/// Kurtosis of distribution of citations
-		BOOst(string)						/// Merton effect
-		SUBgroups							/// Agents collaborate within subgropus
+		BOOst(string)						/// Matthew effect
+		SUBgroups(integer 100)			/// Agents collaborate within subgropus
 		EXChange(real 0)					/// Rate of exchange between subgroups
 		ADVantage(real 1)					/// Factor by which citations of subgroup 2 exceed those of subgroup 1
 		STrategic 							/// strategic selection of team members
@@ -19,18 +19,12 @@ program h_index_dev
 		DILigence(string) 				/// share of scientists who write papers at each round
 		PLOTtimefunctionone(string)	/// Plot expected value of citations and time
 		PLOTtimefunctiontwo				/// second option for plotting without twowayoptions
-		CLEAR] 						// run simulation even if data in memory was not saved
+		CLEAR] 								// run simulation even if data in memory was not saved
 	if "`clear'"=="" { // check for unsaved data
 		quietly describe
 		if r(changed)  { 
 			error 4 
 		}	
-	}
-	if "`subgroups'"=="" {
-		local sgr=0
-	}
-	else if "`subgroups'"!="" {
-		local sgr=1
 	}
 	if `coauthors'<=1 { //average teamsize has to be >1
 		di as error "average teamsize has to be greater than 1"
@@ -38,15 +32,13 @@ program h_index_dev
 	}
 	quietly {
 		//parse options for initial setup
-		*local init = subinstr("`init'", ",", "", 1)
-		subprog_init `init' //FEHLERMELDUNG EINBAUEN, WENN DIE DISTRIBUTION FESTGElEGT WIRD BEI TYPE 2
+		subprog_init `init'
 		local inittype `s(inittype)'
 		if "`inittype'"=="" {
 			local inittype 1
 		}
 		local dpapers `s(dpapers)'
 		local max_age_scientists `s(maxage)'
-		local dil_init `s(dilinit)'
 		//parse distribution options for papers
 		local dpapers = subinstr("`dpapers'", ",", "", 1)
 		subprog_distributions, `dpapers'
@@ -72,6 +64,7 @@ program h_index_dev
 		//parse option for merton effect
 		subprog_merton, `boost'
 		local size=`s(size)'
+		//plot function of expected value of citations with time
 		if "`plottimefunctionone'" != "" {
 			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
 				((1+(x/`alpha')^`speed')^2)), ///
@@ -91,44 +84,48 @@ program h_index_dev
 			noi di "`run' " _cont //display number of run
 			clear
 			tempfile publ scient
-			//create set of N scientists with k papers
+			//create initial set of agents and papers
+			//inittype 1: n agents who have written k papers
+			//inittype 2: n agents who started publishing p periods ago
 			if `inittype'==1 {
-				mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp', `sgr')
+				mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp', `subgroups')
 			}
 			else if `inittype'==2 {
-				mata: scientists2(`n',`max_age_scientists',`dil_init', `sgr')
+				mata: scientists2(`n',`max_age_scientists', `subgroups')
 				bys scientist: egen no_paper_start=total(written)
-				g in_dil= no_paper_start/age_scientist
-				drop if written==0 & no_paper_start >0
+				g in_dil= no_paper_start/age_scientist //papers per period in the past
+				drop if written==0 & no_paper_start >0 //drop periods w/o paper
+				//keep only one record for agents w/o papers
 				bys scientist: drop if no_paper_start==0 & _n>1
 				g paper_id=_n
 			}
-	pause
 			//no of papers can be 0, hence no age
 			replace age_paper=.a if no_paper_start==0
 			//make share of the papers alpha-paper
 			g alpha=runiform()<`sharealpha'
-			//citations
+			//Citations.
 			g citations=0
 			g topstart=0 //variable for number of top papers at beginning
 			forvalues age=1/`max_age_scientists' {
+				//poisson distribution of papers
 				if `d_citations'==1 {
 					g cit_`age'=rpoisson(`factor'*(((`speed'/`alpha')* ///
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
-					if "`subgroups'"!="" {
+					if `subgroups'!=100 {
 						replace cit_`age'=cit_`age'*`advantage' if half==1
 					}
 					sum cit_`age', det
 					g toppaper_`age'=cit_`age'>r(p90) & age_paper>=`age'
 					bys scientist: egen top_`age'=total(toppaper_`age')
-				}	
+				}
+				//negative binomial distrubution of papers
 				else if `d_citations'==3 {
 					g E_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
 						((1+(`age'/`alpha')^`speed')^2)))
 					g p_`age'=E_`age'/(E_`age'*`dcd')
 					g n_`age'=(E_`age'*p_`age')/(1-p_`age')
 					g cit_`age'=rnbinomial(n_`age',p_`age')
-					if "`subgroups'"!="" {
+					if `subgroups'!=100 {
 						replace cit_`age'=cit_`age'*`advantage' if half==1
 					}
 					sum cit_`age', det
@@ -186,13 +183,8 @@ program h_index_dev
 				else if `inittype'==1 {
 					collapse h_0_std h_`prec_year' h_alpha_`prec_year', by(scientist)
 				}
-				
-				
 				g half=0
-				replace half=1 if scientist>`n'/2
-				
-				
-				
+				replace half=1 if scientist>(`subgroups'/100)*_N
 				//select scientists who collaborate, see (1)
 				if `inittype'==1 & `diligence_share'<1 {
 					g select_var=`diligence_corr'*h_0_std+sqrt(1-`diligence_corr'^2)*rnormal()
@@ -202,14 +194,13 @@ program h_index_dev
 					drop select_var
 				}
 				else if `inittype'==2 {
-					keep if pubprob>=runiform()					
+					keep if pubprob>=runiform()
 				}
 				mark written //necessary for self citations
 				//number of teams depends on desired average team size
 				local number_of_teams=_N/(`coauthors')
-				
-				//strategic selection of team members?
-				if "`subgroups'" == "" {
+				if `subgroups' == 100 { //one group contains 100% of agents, i.e. no subgroups
+					//strategic selection of team members?
 					if "`strategic'" != "" {
 						gsort -h_`prec_year'
 						local number_of_teams_round=round(`number_of_teams')
@@ -220,9 +211,9 @@ program h_index_dev
 						g paper_id=runiformint(1,`number_of_teams') //team-number
 					}
 				}
-
-				else if "`subgroups'" != "" {
+				else if `subgroups' != 100 { //two subgroups
 					recode half (0=1) (1=0) if runiform()<`exchange'
+					//strategic selection of team members?
 					if "`strategic'" != "" {
 						gsort half -h_`prec_year'
 						local number_of_teams_round_half=round((`number_of_teams')/2)
@@ -256,37 +247,40 @@ program h_index_dev
 				replace maxh=maxh2 if maxh==. & citations!=.a
 				replace alpha=h_`prec_year'==maxh if alpha==.
 				//new citations for papers
-				if (`d_citations'==1) {
-					if "`subgroups'" == "" {
+				if (`d_citations'==1) { //poisson distribution of citations
+					if `subgroups' == 100 {
 						replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
 							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))) if age_paper!=.a
 					} 
-					else if "`subgroups'" != "" {
+					else if `subgroups' != 100 {
 						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
 							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2)))) if age_paper!=.a  & half != 1
 						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
 							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))))*`advantage' if age_paper!=.a  & half == 1
 					}
 				}
-
-				else if (`d_citations'==3) {
+				else if (`d_citations'==3) { //negative binomial distribution of citations
 					g E=(`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
 						((1+(age_paper/`alpha')^`speed')^2)))
 					g p=E/(E*`dcd')
 					g n=(E*p)/(1-p)
-					if "`subgroups'" == "" {
+					if `subgroups' == 100 { //no subgroups
 						replace citations = citations+rnbinomial(n,p) if age_paper!=.a
 					}
-					else if "`subgroups'" != "" {
+					//two subgroups, one of them with higher citation level 
+					//if advantage>1 specified
+					else if `subgroups' != 100 { 
 						replace citations = citations+rnbinomial(n,p) if age_paper!=.a & half != 1
 						replace citations = citations+rnbinomial(n,p)*`advantage' if age_paper!=.a & half == 1
 					}
 				}
 				sort paper_id, stable
 				by paper_id: replace citations=citations[1]
-				if "`boost'"!="" {
+				//matthew effect, papers from high-h-authors recieve additional citations
+				if "`boost'"!="" { 
 					replace citations=citations+round(maxh*`size') if citations<.
 				}
+				//self citation, agents cite own papers to boost their h index
 				if "`selfcitation'"!="" {
 					sort scientist written
 					by scientist: replace written=written[1]
@@ -298,13 +292,13 @@ program h_index_dev
 				drop written
 				capture drop E p n
 				//count top 10 papers		
-				if "`subgroups'" == "" {
+				if `subgroups' == 100 { //no subgroups
 					sum cit, det
 					g toppaper=cit>r(p90)
 					bys scientist: egen top_`year'=total(toppaper)
 					drop toppaper
 				}
-				else if "`subgroups'" != "" {
+				else if `subgroups' != 100 { //two subgroups
 					sum cit if half==0, det
 					g toppaper=cit>r(p90) & half==0
 					sum cit if half==1, det
@@ -324,8 +318,8 @@ program h_index_dev
 				g alpha_core=alpha==1 & core==1
 				by scientist: egen h_alpha_`year'=total(alpha_core)
 				drop r a number_cit core alpha_core
-				if "`update'"!="" { //reset maxh and alpha to missing
-											//if alpha author is updated every period
+				//reset maxh and alpha to missing if alpha author is updated every period
+				if "`update'"!="" { 
 					replace maxh=. if h_alpha_0==.
 					replace alpha=. if h_alpha_0==.
 				}
@@ -379,8 +373,8 @@ program h_index_dev
 			}
 		}
 		//add variable indicating agent's subgroup
-		if "`subgroups'" != "" {
-			g subgroup=1 if scientist <= `n'/2
+		if `subgroups' != 100 {
+			g subgroup=1 if scientist <= (`subgroups'/100)*`n'
 			recode subgroup (.=2)
 		}
 		compress
@@ -414,6 +408,10 @@ end
 
 program subprog_init, sclass
 	syntax [anything] [, DPapers(string) MAXAge(integer 5) DILINit(real .8)]
+	if "`dpapers'" != "" & `anything' == 2 {
+		di as err "Distribution of papers cannot be specified if init=2"
+		err 197
+	}
 	sreturn local inittype `anything'
 	sreturn local dpapers "`dpapers'"
 	sreturn local maxage `maxage'
@@ -441,7 +439,9 @@ program subprog_plottimefunction
 end
 	
 
-//mata function for initial setup of scientists
+//mata functions for initial setup of scientists
+//function scientists: Agents have written k papers up to five periods ago
+//function scientists2: Agents started to publish k periods ago
 version 15.1
 mata:
 void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
@@ -449,9 +449,9 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 {
 	//create N scientists and number them
 	S=J(1,1,1::n),J(n,1,0)
-	
-	if (sgr==1) {
-		S[|rows(S)/2+1,2 \ rows(S),2|]=J(rows(S)/2,1,1)
+	//create subgroups
+	if (sgr<100) {
+		S[|round(rows(S)*(sgr/100))+1,2 \ rows(S),2|]=J(round(rows(S)*(1-(sgr/100))),1,1)
 	}
 	//random number of papers per scientist
 	if (d_papers==1) {
@@ -475,21 +475,24 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 }
 
 void function scientists2(real scalar n, real scalar max_age_scientists,
-	real scalar dil_init, real scalar sgr) //dil_init not used atm
-{
+	real scalar sgr){
 	//create N scientists with random age
 	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),ibeta(2,5,rbeta(n,1,2,5)):^6,J(n,1,1) 
-	if (sgr==1) {
-		S[|rows(S)/2+1,2 \ rows(S),2|]=J(rows(S)/2,1,1)
+	//create subgroups
+	if (sgr<100) {
+		S[|round(rows(S)*(sgr/100))+1,2 \ rows(S),2|]=J(round(rows(S)*(1-(sgr/100))),1,1)
 	}
+	//expand scientists by time since active in science
 	_mm_expand(S,S[.,3],1,1)
+	//number periods
 	for (i=2; i<=rows(S); i++) {
 		if (S[i,1]==S[(i-1),1]) S[i,5]=S[(i-1),5]+1
 	}
+	//create dummy indicating if agent published in respective period
 	S=S,(S[.,4]:>=runiform(rows(S),1))
 	st_addvar("float", ("scientist","half","age_scientist","pubprob","age_paper","written"))
 	//variables: agent id, subgroup, age of each agent, probability of publishing, period id,
-	//dummy indicating whether agent published in respective period
+	//dummy: agent published
 	st_addobs(rows(S))
 	st_store(.,.,S)
 }
@@ -505,7 +508,7 @@ end
 
 todo
 
-- unterschiedliche Gruppengrößen zulassen
+
 - Optionen für zu speichernde (besser: zu berechnende) Variablen
 - Top-Paper auf Paper-Alter standardisieren
 (help-file aktualisieren)
