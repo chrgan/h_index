@@ -212,24 +212,28 @@ program h_index_dev
 					}
 				}
 				else if `subgroups' != 100 { //two subgroups
-					recode half (0=1) (1=0) if runiform()<`exchange'
+				recode half (0=1) (1=0) if runiform()<`exchange'
 					//strategic selection of team members?
 					if "`strategic'" != "" {
 						gsort half -h_`prec_year'
-						local number_of_teams_round_half=round((`number_of_teams')/2)
-						g paper_id = _n in 1/`number_of_teams_round_half'
-						replace paper_id=runiformint(1,`number_of_teams_round_half') ///
+						local number_of_teams_round_half_0= ///
+							round((`number_of_teams')*(`subgroups'/100))
+						local number_of_teams_round_half_1= ///
+							round((`number_of_teams')*(1-(`subgroups'/100)))
+						g paper_id = _n in 1/`number_of_teams_round_half_0'
+						replace paper_id=runiformint(1,`number_of_teams_round_half_0') ///
 							if half==0 & paper_id==.
 						sum paper_id
 						local lower=r(N)+1
-						local upper=r(N)+`number_of_teams_round_half'
+						local upper=r(N)+`number_of_teams_round_half_1'
 						replace paper_id=_n-r(N)+r(max) in `lower'/`upper'
-						replace paper_id=runiformint(`number_of_teams_round_half'+1,`number_of_teams') ///
+						replace paper_id=runiformint(`number_of_teams_round_half_0'+1,`number_of_teams') ///
 							if paper_id==.
-					}		
-					else {
-						g paper_id=runiformint(1,(`number_of_teams'/2)) if half==0 //team-number
-						replace paper_id=round(runiformint(((`number_of_teams'/2)+1),`number_of_teams')) if half==1
+					}
+					else {	
+						g paper_id=runiformint(1,round(`number_of_teams'*(`subgroups'/100))) ///
+							if half==0 //team-number
+						replace paper_id=round(runiformint((round(`number_of_teams'*(`subgroups'/100))+1),`number_of_teams')) if half==1
 					}
 				}			
 				replace paper_id=paper_id+`max_paper'
@@ -407,15 +411,14 @@ program subprog_distributions, sclass
 end
 
 program subprog_init, sclass
-	syntax [anything] [, DPapers(string) MAXAge(integer 5) DILINit(real .8)]
-	if "`dpapers'" != "" & `anything' == 2 {
+	syntax [anything] [, DPapers(string) MAXAge(integer 5)]
+	if "`dpapers'" != "" & "`anything'" == "2" {
 		di as err "Distribution of papers cannot be specified if init=2"
 		err 197
 	}
 	sreturn local inittype `anything'
 	sreturn local dpapers "`dpapers'"
 	sreturn local maxage `maxage'
-	sreturn local dilinit `dilinit'
 end
 
 program subprog_diligence, sclass
