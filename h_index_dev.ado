@@ -39,6 +39,7 @@ program h_index_dev
 		}
 		local dpapers `s(dpapers)'
 		local max_age_scientists `s(maxage)'
+		local productivity=exp(2.466973)*(`s(productivity)'/100)^2.47832
 		//parse distribution options for papers
 		local dpapers = subinstr("`dpapers'", ",", "", 1)
 		subprog_distributions, `dpapers'
@@ -91,7 +92,7 @@ program h_index_dev
 				mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp', `subgroups')
 			}
 			else if `inittype'==2 {
-				mata: scientists2(`n',`max_age_scientists', `subgroups')
+				mata: scientists2(`n',`max_age_scientists', `subgroups', `productivity')
 				bys scientist: egen no_paper_start=total(written)
 				g in_dil= no_paper_start/age_scientist //papers per period in the past
 				drop if written==0 & no_paper_start >0 //drop periods w/o paper
@@ -411,7 +412,7 @@ program subprog_distributions, sclass
 end
 
 program subprog_init, sclass
-	syntax [anything] [, DPapers(string) MAXAge(integer 5)]
+	syntax [anything] [, DPapers(string) MAXAge(integer 5) PRODuctivity(real 80)]
 	if "`dpapers'" != "" & "`anything'" == "2" {
 		di as err "Distribution of papers cannot be specified if init=2"
 		err 197
@@ -419,6 +420,7 @@ program subprog_init, sclass
 	sreturn local inittype `anything'
 	sreturn local dpapers "`dpapers'"
 	sreturn local maxage `maxage'
+	sreturn local productivity `productivity'
 end
 
 program subprog_diligence, sclass
@@ -478,9 +480,9 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 }
 
 void function scientists2(real scalar n, real scalar max_age_scientists,
-	real scalar sgr){
+	real scalar sgr, real scalar prod){
 	//create N scientists with random age
-	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),ibeta(2,5,rbeta(n,1,2,5)):^6,J(n,1,1) 
+	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),ibeta(2,5,rbeta(n,1,2,5)):^prod,J(n,1,1) 
 	//create subgroups
 	if (sgr<100) {
 		S[|round(rows(S)*(sgr/100))+1,2 \ rows(S),2|]=J(round(rows(S)*(1-(sgr/100))),1,1)

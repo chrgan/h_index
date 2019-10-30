@@ -1,6 +1,6 @@
-v 3.2.1
+v 3.2.2
 d h_index. simulation of collaborating scientists, version under development
 d C. Ganser, LMU Munich
-d Distribution-Date: 20191024
+d Distribution-Date: 20191030
 f h_index_dev.ado
 f h_index_dev.sthlp
