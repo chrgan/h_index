@@ -11,9 +11,7 @@ program h_index_dev
 		Peak(integer 3)					/// Peak of citations
 		SPeed(real 2)						/// Kurtosis of distribution of citations
 		BOOst(string)						/// Matthew effect
-		SUBgroups(real 1)					/// Agents collaborate within subgropus
-		EXChange(real 0)					/// Rate of exchange between subgroups
-		ADVantage(real 1)					/// Factor by which citations of subgroup 2 exceed those of subgroup 1
+		SUBgroups(string)					/// Agents collaborate within subgropus
 		STrategic 							/// strategic selection of team members
 		SELfcitation						/// cite papers with citations 1 below h
 		DILigence(string) 				/// share of scientists who write papers at each round
@@ -60,6 +58,11 @@ program h_index_dev
 		subprog_diligence, `diligence'
 		local diligence_share `s(share)'
 		local diligence_corr `s(correlation)'
+		//parse options for subgroups
+		subprog_subgroups `subgroups'
+		local subgroups `s(size)'
+		local exchange `s(exchange)'
+		local advantage `s(advantage)'
 		//parse option for merton effect
 		subprog_merton, `boost'
 		local size=`s(size)'
@@ -99,6 +102,7 @@ program h_index_dev
 			}
 			else if `inittype'==2 {
 				mata: scientists2(`n',`max_age_scientists', `subgroups', `productivity')
+pause
 				bys scientist: egen no_paper_start=total(written)
 				g in_dil= no_paper_start/age_scientist //papers per period in the past
 				drop if written==0 & no_paper_start >0 //drop periods w/o paper
@@ -406,6 +410,18 @@ program h_index_dev
 			ren alpha_* h_alpha_*
 		}
 		if "`save_alpha'" == "" drop h_alpha_*
+		if "`save_alpha'" != "" & `inittype' == 2 {
+			forvalues per=0/`periods' {
+				g h_alpha_std_`per'=h_alpha_`per'/(age_scientist_start+`per')
+			}
+		}
+		//order variables, remove labels
+		capture ren h_alpha_* alpha_*
+		capture order h_* alpha_*, after(no_paper_start)
+		capture ren alpha_* h_alpha_*
+		foreach var of varlist _all {
+			lab var `var' ""
+		}
 		//add variable indicating agent's subgroup
 		if `subgroups' != 1 {
 			g subgroup=1 if scientist <= `subgroups'*`n'
@@ -438,6 +454,14 @@ program subprog_distributions, sclass
 	sreturn local dist "`dist'"
 	sreturn local mean `mean'
 	sreturn local dispersion `dispersion'
+end
+
+program subprog_subgroups, sclass
+	syntax [anything] [, EXChange(real 0) ADVantage(real 1)]
+	if "`anything'" == "" local anything=1
+	sreturn local size `anything'
+	sreturn local exchange `exchange'
+	sreturn local advantage `advantage'
 end
 
 program subprog_init, sclass
@@ -479,6 +503,10 @@ end
 
 program subprog_generate, sclass
 	syntax [, TOPpapers M H HAlpha]
+	if "`toppapers'" == "" & "`m'" == "" & "`h'" == "" & "`halpha'" == "" {
+		noi di as err "At least one measure has to be specified using the generate() option"
+		err 197
+	}
 	sreturn local toppapers "`toppapers'"
 	sreturn local mindex "`m'"
 	sreturn local save_h "`h'"

@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.4  21apr2019}{...}
+{* *! version 0.5 12nov2019}{...}
 {viewerjumpto "Syntax" "h_index##syntax"}{...}
 {viewerjumpto "Description" "h_index##description"}{...}
 {viewerjumpto "Options" "h_index##options"}{...}
@@ -8,7 +8,8 @@
 {viewerjumpto "Author" "h_index##author"}{...}
 {p2colset 1 15 17 2}{...}
 {p2col:{bf:h_index} {hline 2}}Simulate the effect of publishing, being cited, 
-and (strategic) collaborating on the development of h-index and h-alpha index values for a specified set of agents.{p_end}
+and (strategic) collaborating on the development of h-index and other 
+bibliometric indicators for a specified set of agents.{p_end}
 {p2colreset}{...}
 
 
@@ -25,64 +26,93 @@ and (strategic) collaborating on the development of h-index and h-alpha index va
 {syntab:Main}
 {synopt :{opt r:uns(#)}}repeat simulation # times{p_end}
 {synopt :{opt n(#)}}create # agents per simulation{p_end}
-{synopt :{opt init(init_options)}}Initial setup{p_end}
-{synopt :{opt co:authors(#)}}average number of collaborating co-authors{p_end}
+{synopt :{opt init(init_options)}}initial setup{p_end}
+{synopt :{opt co:authors(#)}}average number of collaborating agents (co-authors){p_end}
 {synopt :{opt per:iods(#)}}let agents collaborate across {it:p} periods {p_end}
 {synopt :{opt sh:arealpha(#)}}share of previously published papers where agents are 
 alpha-authors.{p_end}
 {synopt :{opt dc:itations(distribution_options)}}distribution of citations papers receive in simulation{p_end}
-{synopt :{opt sub:groups}}let agents collaborate within two subgroups{p_end}
-{synopt :{opt exc:hange}}share of agents of each subgroup collaborating with 
-agents of other subgroup each period{p_end}
-{synopt :{opt adv:antage}}specifies factor by which citations of papers published
-by agents of subgroup 2 exceed citations of papers published by subgroup 1.{p_end}
+{synopt :{opt sub:groups(subgroup_options)}}let agents collaborate within two subgroups (1 and 2){p_end}
 {synopt :{opt up:date}}update alpha authors each period{p_end}
 {synopt :{opt p:eak(#)}}period when number of citations reaches its maximum{p_end}
 {synopt :{opt sp:eed(#)}}steepness of period function{p_end}
 {synopt :{cmdab:boo:st}([{cmd:}{it:{ul:si}ze(#)}])}boost of citations by cumulative advantage effects{p_end}
 {synopt :{opt st:rategic}}let agents strategically select co-authors{p_end}
-{synopt :{opt sel:fcitation}}let agents cite their own papers{p_end}
+{synopt :{opt sel:fcitation}}let agents strategically cite their own papers{p_end}
 {synopt :{cmdab:dil:igence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}])}share of agents publishing papers each period{p_end}
 {synopt :{cmdab:plot:timefunction}[({it:{help twoway_options}})]}plot expected values of citations as function of period{p_end}
+{synopt :{opt g:enerate(variables)}}select variables to generate, may be one or more of 
+{opt top:papers} {opt m:} {opt h:} {opt ha:lpha}{p_end}
 {synopt :{opt clear}}overwrite current data in memory{p_end}
 
 {syntab:init_options}
-{synopt :#}Type of inititial setup, may be 1 or 2{p_end}
+{synopt :#}type of inititial setup, may be 1 or 2{p_end}
 {synopt :{opt dp:apers(distribution_options)}}initial distribution of papers 
 which have been published by agents{p_end}
-{synopt :{opt maxa:ge}}Maximum number of periods agents have published before
+{synopt :{opt maxa:ge}}maximum number of periods agents have published before
 collaboration starts{p_end}
-{synopt :{opt dilin:it}}Share of agents publishing each period before collaboration
-starts{p_end}
+{synopt :{opt prod:uctivity(#)}}share of papers published by the 20% most productive
+agents{p_end}
 
 {syntab:distribution_options}
-{synopt :{cmdab:poi:sson} [{cmd:,} {it:{ul:m}ean(#)}]}Poisson with mean {it:#}{p_end}
+{synopt :{cmdab:poi:sson} [{cmd:,} {it:{ul:m}ean(#)}]}poisson with mean {it:#}{p_end}
 {synopt :{cmdab:negb:in} [{cmd:,} {it:{ul:m}ean(#) {ul:d}ispersion(#)}]}negative 
 binomial with mean {it:#} and dispersion {it:#} {p_end}
+
+{syntab:subgroup_options}
+{synopt :#}relative size of one of two subgroups{p_end}
+{synopt :{opt exc:hange}}share of agents of each subgroup collaborating with 
+agents of other subgroup each period{p_end}
+{synopt :{opt adv:antage}}specifies factor by which citations of papers published
+by agents of subgroup 2 exceed citations of papers published by subgroup 1.{p_end}
 
 {marker description}{...}
 {title:Description}
 
 {pstd}
 {opt h_index} simulates agents publishing papers without or with co-authors across t 
-periods with actions. For each period, h-index (Hirsch, 2005) and h-alpha-index 
-(Hirsch, 2019) values for every agent are calculated based on the number of 
-citations each paper receives. In each period, the simulation is repeated r times 
+periods with actions. For each period, the following bibliometric indicators can be 
+calculated based on the number of citations each paper receives: h-index (Hirsch, 2005); 
+m-index (i.e. h-index standardized by time since 
+first publication of the author); h-alpha-index (Hirsch, 2019) and h-alpha-index standardized by 
+time since first publication of the author; the number of highly cited
+papers written by an author and the number of highly cited papers standardized by time 
+since first publication of the author (these are papers belonging to the 10% most 
+frequently cited papers in the dataset). The simulation is repeated r times 
 to enhance the robustness of the results.
 
 {pstd}
-h_index produces a dataset containing the following variables:
+h_index produces a dataset containing the following variables (depending on user specifications):
 
 {synoptset 20 tabbed}{...}
-{synopt:{cmd:agent}}consecutive number of agents per simulation{p_end}
+{synopt:{it:Basic variables}}{p_end}
+{synopt:{cmd:scientist}}consecutive number of agents per simulation{p_end}
 {synopt:{cmd:run}}consecutive number of runs{p_end}
-{synopt:{cmd:startage}}age of oldest paper of each scientist before collaboration starts{p_end}
+{synopt:{cmd:age_scientist_start}}number of periods since each scientist started publishing before collaboration starts{p_end}
+{synopt:{cmd:pubprob}}Agent's probability of publishing each period{p_end}
 {synopt:{cmd:no_paper_start}}number of previously published papers per agent{p_end}
-{synopt:{cmd:h_0}}h-index of each agent before acting starts{p_end}
-{synopt:{cmd:h_alpha_0}}h-alpha-index of each agent before acting starts{p_end}
-{synopt:{cmd:h_*}}h-index of each agent per period{p_end}
-{synopt:{cmd:h_alpha_*}}h-alpha-index of each agent per period{p_end}
 {synopt:{cmd:subgroup}}subgroup each agent belongs to (only if {opt subgroup} is specified){p_end}
+
+
+{p 6 6 2}
+{it:Bibliometric indicators}{p_end}
+{p 6 6 2}
+The following variables have a suffix # indicating the period of
+action. Suffix 0 indicates the respective indicator before acting starts
+(i.e., after the initial setup), suffixes 1 to {it:T} indicate the respective
+indicator for each period with action of each agent.{p_end}
+
+{synopt:{cmd:h_#}}h-index{p_end}
+{synopt:{cmd:h_alpha_#}}h-alpha-index{p_end}
+{synopt:{cmd:h_alpha_std_#}}h-alpha-index standardized by the number of periods 
+since the agent started publishing{p_end}
+{synopt:{cmd:m_#}}m-index, which is the h-index standardized by the number of periods 
+since the agent started publishing {p_end}
+{synopt:{cmd:top_#}}number of top papers published by an agent. A top paper is defined by
+belonging to the 10% mostly cited papers. If a paper is a top paper in multiple
+periods, it is counted multiple times.{p_end}
+{synopt:{cmd:top_#_std}}number of top papers published by an agent standardized 
+by the number of periods since the agent started publishing{p_end}
 
 {pstd}
 If one is interested in reproducing results, one should first set the
@@ -102,10 +132,10 @@ The package {net "describe moremata, from(http://fmwww.bc.edu/RePEc/bocode/m)":m
 {phang}
 {opt init(init_options)} specifies the type of the initial setup. If type 1, the default,
 is specified, every agent is assumed to have published p papers before the 
-simulation of collaboration starts. It is assumed that each paper has been bublished
+simulation of collaboration starts. It is assumed that each paper has been published
 1 to 5 periods ago and the distribution of the number of 
 previously published papers can be specified. By using type 2, it is possible to specify how many periods
-ago agents have started to publish and the share of periods in which agents have published.
+ago agents have started to publish and the share of papers published by the most productive agents.
 This allows, for example, to analyze the influence of seniority.
 
 {phang}
@@ -126,15 +156,15 @@ distribution of citations at the time when citations reach their maximum
 (see {opt peak()}). Before and after the peak, the expected value of the citation distribution is always lower.
 
 {phang}
-{opt subgroups} specifies that agents belong to two (equaly large) subgroups. For
+{opt subgroups(subgroup_options)} specifies that agents belong to two subgroups. For
 example, imagine a research institute where scientists publish in two adjacent 
 subdisciplines.
 
 {phang}
 {opt exchange(#)} specifies the share of agents publishing (alone or in collaboration)
-in the field of the other subgroup each period. For example, when specifying 
+with the other subgroup in each period. For example, when specifying 
 {opt exchange(.1)}, 10 percent of each subgroup join the other subgroup each period. Default
-is 0, i.e. agents do not publish in the other field.
+is 0, i.e. agents do not publish with the other subgroup.
 
 {phang}
 {opt advantage(#)} specifies a factor by which citations of papers bublished by agents 
@@ -172,10 +202,10 @@ to improve their h-alpha-index.
 
 {phang}
 {opt selfcitation} When this option is set, a paper gets one additional citation if
-at least one of its authors has a h index which exceeds the number of previous
+at least one of its authors has a h-index which exceeds the number of previous
 citations of the paper by one or two. This reflects agents strategically citing 
-their own papers with citations just below their h index to accelerate the growth of
-their h index.
+their own papers with citations just below their h-index to accelerate the growth of
+their h-index.
 
 {phang}
 {opt diligence}([{cmd:}{it:{ul:sh}are(#) {ul:c}orrelation(#)}]) By default, every agent is assigned to co-authorships
@@ -185,7 +215,9 @@ its correlation with the initial h-index can be set. {it:share(#)} with {it:0<#<
 	 specifies the share of agents publishing a new paper each period. {it:correlation(#)}
 	 with {it:0<#<=1} specifies the correlation between the probability of publishing a paper
 	 with the initial h-index value. Thus, one can specify that agents with high 
-	 initial h-index values are more productive in general.
+	 initial h-index values are more productive in general. This option is only
+	 available with {opt init(1)}, because with {opt init(2)} each agent is assumed
+	 to have a probability of publishing which is constant over time.
 
 {phang}
 {opt plottimefunction} produces a graph showing the expected citation values
@@ -195,6 +227,14 @@ the number of periods specified by {opt periods(#)} and preset titles for the
 axes will be used. You can alter this by specifying {opt plottimefunction(twoway_options)}, 
 which allows for all {help twoway_options}. When using {opt plottimefunction(twoway_options)},
 at least one twoway option has to be specified, otherwise no graph will appear. Also see {help twoway function}.
+
+{phang}
+{opt genereate(variables)} specifies which indicators to compute. One or more of the 
+following indicators may be specified: {opt top:papers} (number of top papers and
+number of top papers standardized), {opt m:} (m-index), {opt h:} (h-index),
+ {opt ha:lpha} (h-alpha-index and h-alpha-index standardized). See 
+ {help h_index_dev##description:description} for details. At least one option
+ has to be specified.
 
 {phang}
 {opt clear} forces h_index to run even though the dataset has changed since it was 
@@ -211,11 +251,14 @@ previously published papers.
 {opt maxage(#)} specifies how many periods ago agents have started to publish at most. Default is 5.
 
 {phang}
-{opt dilinit(#)} specifies the share of periods in which agents have published. Default is .8.
+{opt productivity(#)} specifies the share of papers published by the 20% most 
+productive agents in percent. This share is held constant througout the periods
+in which agents collaborate. Default is 80.
 
 {phang}
-For example, if you specify {cmd: init(2, maxage(20) dilinit(.5))}, agents have started
-publishing 1 to 20 periods ago and have published a paper every second period on average.
+For example, if you specify {cmd: init(2, maxage(20) productivity(70))}, agents have started
+publishing 1 to 20 periods ago and the 20 percent most productive agents publish 70
+percent of all papers on average.
 
 {dlgtab:distribution_options}
 
@@ -231,7 +274,29 @@ For example, if one specifies {cmd: negbin, mean(3) dispersion(2)}, the expected
 {help rnbinomial()} are calculated from mean() and dispersion(). The default for 
 {it:mean} is 2, the default for {it:dispersion} is 1.1. {it:dispersion(#)} must 
 be greater than 1.
-	 
+
+{dlgtab:subgroup_options}
+
+{phang}
+{opt #} specifies that agents belong to two subgroups, and that a share of # agents
+belongs to the first of the two groups.
+
+{phang}
+{opt advantage(#)} specifies that the papers published by the agents in the second
+subgroup recieve #-times the citations of the papers published by agents in the first subgroup.
+
+{phang}
+{opt exchange(#)} specifies the share of agents of each subgroup collaborating 
+with agents of the other subgroup each period.
+
+{phang}
+For example, if you specify {cmd: subgroups(.2, advantage(1.5) exchange(.1))},
+20 percent of all agents belong to subgroup 1. The papers published by the agents
+of subgroup 2 (consisting of the other 80 percent of all agents) receive 1.5 times the
+citations of the papers published by agents of subgroup 1. However, in each period
+10 percent of the agents of subgroup 1 collaborate with agents of subgroup 2 and 
+vice versa.
+
 {marker examples}{...}
 {title:Examples}
 
