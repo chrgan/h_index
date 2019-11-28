@@ -102,7 +102,6 @@ program h_index_dev
 			}
 			else if `inittype'==2 {
 				mata: scientists2(`n',`max_age_scientists', `subgroups', `productivity')
-pause
 				bys scientist: egen no_paper_start=total(written)
 				g in_dil= no_paper_start/age_scientist //papers per period in the past
 				drop if written==0 & no_paper_start >0 //drop periods w/o paper
@@ -117,7 +116,6 @@ pause
 			//Citations.
 			g citations=0
 			//variable for number of top papers at beginning
-			if "`toppapers'" != "" g topstart=0
 			forvalues age=1/`max_age_scientists' {
 				//poisson distribution of papers
 				if `d_citations'==1 {
@@ -125,12 +123,7 @@ pause
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
 					if `subgroups'!=1 {
 						replace cit_`age'=cit_`age'*`advantage' if half==1
-					}
-					if "`toppapers'" != "" {
-						sum cit_`age', det
-						g toppaper_`age'=cit_`age'>r(p90) & age_paper>=`age'
-						bys scientist: egen top_`age'=total(toppaper_`age')
-					}
+					}				
 				}
 				//negative binomial distrubution of papers
 				else if `d_citations'==3 {
@@ -142,22 +135,30 @@ pause
 					if `subgroups'!=1 {
 						replace cit_`age'=cit_`age'*`advantage' if half==1
 					}
-					sum cit_`age', det
-					if "`toppapers'" != "" {
-						g toppaper_`age'=cit_`age'>r(p90) & age_paper>=`age'
-						bys scientist: egen top_`age'=total(toppaper_`age')	
-					}
 				}
 			}
 			local i=1
 			while `i'<=`max_age_scientists' {
-				replace citations=citations+cit_`i' if age_paper>=`i'
-				if "`toppapers'" != "" replace topstart=topstart+top_`i' 
+				replace citations=citations+cit_`i' if age_paper>=`i' 
 				local ++i
 			}
-			if "`toppapers'" != "" drop cit_* top_* toppaper_*
-			else drop cit_*
-			if "`toppapers'" != "" ren topstart top_0
+			if "`toppapers'" != "" {
+				if `subgroups' == 1 {
+					sum citations, det
+					g toppapers=citations>r(p90) & citations<.
+					bys scientist: egen top_0=total(toppapers)
+					drop toppapers
+				}
+				else if `subgroups' != 1 {
+					sum citations if half==0, det
+					g toppapers=citations>r(p90) & citations<. if half==0
+					sum citations if half==1, det
+					replace toppapers=citations>r(p90) & citations<. if half==1
+					bys scientist: egen top_0=total(toppapers)
+					drop toppapers
+				}
+			}
+			drop cit_*
 			replace citations=.a if age_paper==.a
 			capture drop E_* p_* n_*
 			//calculate h
@@ -315,16 +316,25 @@ pause
 				//count top 10 papers
 				if "`toppapers'" != "" {
 					if `subgroups' == 1 { //no subgroups
-						sum cit, det
-						g toppaper=cit>r(p90)
+						preserve
+						collapse citations, by(paper_id)
+						sum citations, det
+						restore
+						g toppaper=citations>r(p90) & citations<.
 						bys scientist: egen top_`year'=total(toppaper)
 						drop toppaper
 					}
 					else if `subgroups' != 1 { //two subgroups
-						sum cit if half==0, det
-						g toppaper=cit>r(p90) & half==0
-						sum cit if half==1, det
-						replace toppaper=1 if cit>r(p90) & half==1
+						preserve
+						collapse half citations, by(paper_id)
+						sum citations if half==0, det
+						restore
+						g toppaper=cit>r(p90) & cit<. & half==0
+						preserve
+						collapse half citations, by(paper_id)
+						sum citations if half==1, det
+						restore
+						replace toppaper=1 if citations>r(p90) & citations<. & half==1
 						bys scientist: egen top_`year'=total(toppaper)
 						drop toppaper
 					}
@@ -579,10 +589,4 @@ end
 
 (2) https://www.statalist.org/forums/forum/general-stata-discussion/general/
 1315697-syntax-for-options-within-options
-
-todo
-
-- Top-Paper auf Paper-Alter standardisieren
-(help-file aktualisieren)
-
 
