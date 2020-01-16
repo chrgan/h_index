@@ -103,7 +103,6 @@ program h_index_dev
 			else if `inittype'==2 {
 				mata: scientists2(`n',`max_age_scientists', `subgroups', `productivity')
 				bys scientist: egen no_paper_start=total(written)
-				g in_dil= no_paper_start/age_scientist //papers per period in the past
 				drop if written==0 & no_paper_start >0 //drop periods w/o paper
 				//keep only one record for agents w/o papers
 				bys scientist: drop if no_paper_start==0 & _n>1
@@ -550,7 +549,7 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 	//paper id, random age of papers
 	for (i=1; i<=rows(S); ++i) {
 		S[i,(cols(S)-1)]=i
-		S[i,cols(S)]=runiformint(1,1,1,S[i,3])
+		S[i,cols(S)]=runiformint(1,1,1,5)
 	}
 	//put to stata
 	st_addvar("float", ("scientist","half","no_paper_start","paper_id","age_paper"))
@@ -561,7 +560,7 @@ void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
 void function scientists2(real scalar n, real scalar max_age_scientists,
 	real scalar sgr, real scalar prod){
 	//create N scientists with random age
-	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),ibeta(2,5,rbeta(n,1,2,5)):^prod,J(n,1,1) 
+	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),runiform(n,1):^prod,J(n,1,1) 
 	//create subgroups
 	if (sgr<1) {
 		S[|round(rows(S)*sgr)+1,2 \ rows(S),2|]=J(round(rows(S)*(1-sgr)),1,1)

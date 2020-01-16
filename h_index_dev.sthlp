@@ -161,17 +161,6 @@ example, imagine a research institute where scientists publish in two adjacent
 subdisciplines.
 
 {phang}
-{opt exchange(#)} specifies the share of agents publishing (alone or in collaboration)
-with the other subgroup in each period. For example, when specifying 
-{opt exchange(.1)}, 10 percent of each subgroup join the other subgroup each period. Default
-is 0, i.e. agents do not publish with the other subgroup.
-
-{phang}
-{opt advantage(#)} specifies a factor by which citations of papers bublished by agents 
-of subgroup 2 exceed those of papers published by subgroup 1. This reflects subdisciplines
-with different citation levels. Default is 1, i.e. equal citation levels.
-
-{phang}
 {opt update} specifies that the alpha author of new papers is determined 
 every period based on the current h values of its authors. Without this option,
 the alpha author is determined when the paper has been published and held constant from then on.
@@ -243,6 +232,9 @@ last saved.
 {dlgtab:init_options}
 
 {phang}
+{opt #} specifies the type of the initial setup, see above. Default is type 1.
+
+{phang}
 {opt dpapers(distribution_options)} is for use with type 1. Every agent is assumed to have published {it:p} 
 papers before the simulation starts. {opt dpapers()} specifies the distribution of the number of 
 previously published papers.
@@ -282,12 +274,15 @@ be greater than 1.
 belongs to the first of the two groups.
 
 {phang}
-{opt advantage(#)} specifies that the papers published by the agents in the second
-subgroup recieve #-times the citations of the papers published by agents in the first subgroup.
+{opt exchange(#)} specifies the share of agents publishing (alone or in collaboration)
+with the other subgroup in each period. For example, when specifying 
+{opt exchange(.1)}, 10 percent of each subgroup join the other subgroup each period. Default
+is 0, i.e. agents do not publish with the other subgroup.
 
 {phang}
-{opt exchange(#)} specifies the share of agents of each subgroup collaborating 
-with agents of the other subgroup each period.
+{opt advantage(#)} specifies a factor by which citations of papers bublished by agents 
+of subgroup 2 exceed those of papers published by subgroup 1. This reflects subdisciplines
+with different citation levels. Default is 1, i.e. equal citation levels.
 
 {phang}
 For example, if you specify {cmd: subgroups(.2, advantage(1.5) exchange(.1))},
