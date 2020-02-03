@@ -1,5 +1,3 @@
-*Generate hat h und halpha als standard, man muss nicht unbedingt was spezifizieren
-
 {smcl}
 {* *! version 0.5 12nov2019}{...}
 {viewerjumpto "Syntax" "h_index##syntax"}{...}
@@ -221,12 +219,12 @@ which allows for all {help twoway_options}. When using {opt plottimefunction(two
 at least one twoway option has to be specified, otherwise no graph will appear. Also see {help twoway function}.
 
 {phang}
-{opt genereate(variables)} specifies the indicators to be computed. One or more of the 
+{opt generate(variables)} specifies the indicators to be computed. One or more of the 
 following indicators may be specified: {opt top:papers} (number of highly cited papers and
 number of highly cited papers standardized), {opt m:} (m-index), {opt h:} (h-index),
  {opt ha:lpha} (h-alpha-index and h-alpha-index standardized) (see 
- {help h_index_dev##description:description} for details). At least one option
- must be specified.
+ {help h_index_dev##description:description} for details). The default is to
+ generate h-index and h-alpha-index.
 
 {phang}
 {opt clear} forces h_index to run even though the dataset has changed since it was 
