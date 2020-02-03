@@ -1,3 +1,5 @@
+*Generate hat h und halpha als standard, man muss nicht unbedingt was spezifizieren
+
 {smcl}
 {* *! version 0.5 12nov2019}{...}
 {viewerjumpto "Syntax" "h_index##syntax"}{...}
@@ -238,7 +240,9 @@ last saved.
 {phang}
 {opt dpapers(distribution_options)} is for use with type 1 only. Every agent is assumed to have published {it:p} 
 papers before the simulation starts. {opt dpapers()} specifies the distribution of the number of 
-previously published papers.
+previously published papers. This suboption is also available as an option,
+i.e. {cmd:h_index, init(1, dpapers(...))} is equivalent to {cmd: h_index, dpapers(...)}. 
+When using the latter, init() cannot be specified. 
 
 {phang}
 {opt maxage(#)} specifies how many periods ago agents have started to publish at most. The default is 5.

@@ -3,6 +3,7 @@ program h_index_dev
 	syntax [, Runs(integer 1) 			/// repeat simulation r times
 		n(integer 100) 					/// number of scientists
 		INIT(string)						/// initial setup
+		DPapers(string) 					/// initial distribution of papers
 		COauthors(real 5) 				/// average team size
 		PERiods(integer 20) 				/// how often scientists collaborate
 		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
@@ -29,11 +30,20 @@ program h_index_dev
 		di as error "average teamsize has to be greater than 1"
 		exit
 	}
+	if "`init'" != "" & "`dpapers'" != "" {
+		di as err "Option dpapers() cannot be used when init() is specified. " ///
+			"You can specify dpapers() either as an option " ///
+			"(which implies using initial setup type 1) or as a suboption of init() " ///
+			"but not specify both dpapers() and init() as an option."
+		exit
+	}
 	quietly {
 		//parse options for initial setup
 		subprog_init `init'
 		local inittype `s(inittype)'
-		local dpapers `s(dpapers)'
+		if "`dpapers'" == "" {
+			local dpapers `s(dpapers)'
+		}
 		local max_age_scientists `s(maxage)'
 		local productivity=exp(2.466973)*(`s(productivity)'/100)^2.47832
 		//parse distribution options for papers
@@ -513,8 +523,8 @@ end
 program subprog_generate, sclass
 	syntax [, TOPpapers M H HAlpha]
 	if "`toppapers'" == "" & "`m'" == "" & "`h'" == "" & "`halpha'" == "" {
-		noi di as err "At least one measure has to be specified using the generate() option"
-		err 197
+		local h="h"
+		local halpha="halpha"
 	}
 	sreturn local toppapers "`toppapers'"
 	sreturn local mindex "`m'"
