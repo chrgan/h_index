@@ -1,7 +1,7 @@
 # h_index
 This is an ado for Stata, a statistics/data analysis software.
 
-The ado Simulate the effect of publishing, being cited, and (strategic) collaboration on the development of the h-index and other bibliometric indicators (h-alpha, m-index, number of highly-cited papers) for a specified set of agents.
+The ado simulates the effect of publishing, being cited, and (strategic) collaboration on the development of the h-index and other bibliometric indicators (h-alpha, m-index, number of highly-cited papers) for a specified set of agents.
 
 In Stata, type 
 
