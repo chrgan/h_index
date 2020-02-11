@@ -1,33 +1,51 @@
-program h_index
+program h_index_dev
 	version 15.1
 	syntax [, Runs(integer 1) 			/// repeat simulation r times
 		n(integer 100) 					/// number of scientists
+		INIT(string)						/// initial setup
+		DPapers(string) 					/// initial distribution of papers
 		COauthors(real 5) 				/// average team size
 		PERiods(integer 20) 				/// how often scientists collaborate
-		DPapers(string) 					/// initial distribution of papers
 		SHarealpha(real .33)				/// share of initial papers where author is Alpha-Author
 		DCitations(string) 				/// distribution of citations of new papers
 		UPdate								/// update alpha author
 		Peak(integer 3)					/// Peak of citations
 		SPeed(real 2)						/// Kurtosis of distribution of citations
-		BOOst(string)						/// Merton effect
+		BOOst(string)						/// Matthew effect
+		SUBgroups(string)					/// Agents collaborate within subgropus
 		STrategic 							/// strategic selection of team members
 		SELfcitation						/// cite papers with citations 1 below h
 		DILigence(string) 				/// share of scientists who write papers at each round
 		PLOTtimefunctionone(string)	/// Plot expected value of citations and time
 		PLOTtimefunctiontwo				/// second option for plotting without twowayoptions
-		CLEAR] 						// run simulation even if data in memory was not saved
+		Generate(string)					/// select variables to compute
+		CLEAR] 								// run simulation even if data in memory was not saved
 	if "`clear'"=="" { // check for unsaved data
 		quietly describe
 		if r(changed)  { 
 			error 4 
-		}
+		}	
 	}
 	if `coauthors'<=1 { //average teamsize has to be >1
 		di as error "average teamsize has to be greater than 1"
 		exit
 	}
+	if "`init'" != "" & "`dpapers'" != "" {
+		di as err "Option dpapers() cannot be used when init() is specified. " ///
+			"You can specify dpapers() either as an option " ///
+			"(which implies using initial setup type 1) or as a suboption of init() " ///
+			"but not specify both dpapers() and init() as an option."
+		exit
+	}
 	quietly {
+		//parse options for initial setup
+		subprog_init `init'
+		local inittype `s(inittype)'
+		if "`dpapers'" == "" {
+			local dpapers `s(dpapers)'
+		}
+		local max_age_scientists `s(maxage)'
+		local productivity=exp(2.466973)*(`s(productivity)'/100)^2.47832
 		//parse distribution options for papers
 		local dpapers = subinstr("`dpapers'", ",", "", 1)
 		subprog_distributions, `dpapers'
@@ -50,20 +68,34 @@ program h_index
 		subprog_diligence, `diligence'
 		local diligence_share `s(share)'
 		local diligence_corr `s(correlation)'
+		//parse options for subgroups
+		subprog_subgroups `subgroups'
+		local subgroups `s(size)'
+		local exchange `s(exchange)'
+		local advantage `s(advantage)'
 		//parse option for merton effect
 		subprog_merton, `boost'
 		local size=`s(size)'
+		//plot function of expected value of citations with time
 		if "`plottimefunctionone'" != "" {
 			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
 				((1+(x/`alpha')^`speed')^2)), ///
-				range(0 `periods') xti("Period") yti("Expected value of citations") `plottimefunctionone'
-			
+				range(0 `periods') xti("Period") yti("Expected value of citations") `plottimefunctionone'	
 		}
 		if "`plottimefunctiontwo'" != "" {
 			subprog_plottimefunction y=`factor'*(((`speed'/`alpha')*(x/`alpha')^(`speed'-1))/ ///
 				((1+(x/`alpha')^`speed')^2)), ///
 				range(0 `periods') xti("Period") yti("Expected value of citations")
-			
+		}
+		//parse options for computing variables
+		subprog_generate, `generate'
+		local toppapers "`s(toppapers)'"
+		local mindex "`s(mindex)'"
+		local save_h "`s(save_h)'"
+		local save_alpha "`s(save_alpha)'"
+		if "`mindex'" != "" & `inittype' == 1 {
+			noi di as err "Option generate(m) only allowed with init(2)"
+			err 197
 		}
 		//simulation starts here
 		local obs=0 //needed to keep track of number of obs
@@ -72,34 +104,72 @@ program h_index
 			noi di "`run' " _cont //display number of run
 			clear
 			tempfile publ scient
-			//create set of N scientists with k papers
-			mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp',`sharealpha')
+			//create initial set of agents and papers
+			//inittype 1: n agents who have written k papers
+			//inittype 2: n agents who started publishing p periods ago
+			if `inittype'==1 {
+				mata: scientists(`n',`d_papers',`dpm',`dpn',`dpp', `subgroups')
+			}
+			else if `inittype'==2 {
+				mata: scientists2(`n',`max_age_scientists', `subgroups', `productivity')
+				bys scientist: egen no_paper_start=total(written)
+				drop if written==0 & no_paper_start >0 //drop periods w/o paper
+				//keep only one record for agents w/o papers
+				bys scientist: drop if no_paper_start==0 & _n>1
+				g paper_id=_n
+			}
 			//no of papers can be 0, hence no age
 			replace age_paper=.a if no_paper_start==0
-			//citations
+			//make share of the papers alpha-paper
+			g alpha=runiform()<`sharealpha'
+			//Citations.
 			g citations=0
-			forvalues age=1/5 {
+			//variable for number of top papers at beginning
+			forvalues age=1/`max_age_scientists' {
+				//poisson distribution of papers
 				if `d_citations'==1 {
 					g cit_`age'=rpoisson(`factor'*(((`speed'/`alpha')* ///
 						((`age'/`alpha')^(`speed'-1)))/((1+(`age'/`alpha')^`speed')^2)))
-				}	
+					if `subgroups'!=1 {
+						replace cit_`age'=cit_`age'*`advantage' if half==1
+					}				
+				}
+				//negative binomial distrubution of papers
 				else if `d_citations'==3 {
-					g p_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
-						((1+(`age'/`alpha')^`speed')^2)))/((`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
-						((1+(`age'/`alpha')^`speed')^2)))*`dcd')
-					g n_`age'=((`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
-						((1+(`age'/`alpha')^`speed')^2)))*p_`age')/(1-p_`age')
+					g E_`age'=(`factor'*(((`speed'/`alpha')*((`age'/`alpha')^(`speed'-1)))/ ///
+						((1+(`age'/`alpha')^`speed')^2)))
+					g p_`age'=E_`age'/(E_`age'*`dcd')
+					g n_`age'=(E_`age'*p_`age')/(1-p_`age')
 					g cit_`age'=rnbinomial(n_`age',p_`age')
+					if `subgroups'!=1 {
+						replace cit_`age'=cit_`age'*`advantage' if half==1
+					}
 				}
 			}
 			local i=1
-			while `i'<=5 {
-				replace citations=citations+cit_`i' if age_paper>=`i'
+			while `i'<=`max_age_scientists' {
+				replace citations=citations+cit_`i' if age_paper>=`i' 
 				local ++i
+			}
+			if "`toppapers'" != "" {
+				if `subgroups' == 1 {
+					sum citations, det
+					g toppapers=citations>r(p90) & citations<.
+					bys scientist: egen top_0=total(toppapers)
+					drop toppapers
+				}
+				else if `subgroups' != 1 {
+					sum citations if half==0, det
+					g toppapers=citations>r(p90) & citations<. if half==0
+					sum citations if half==1, det
+					replace toppapers=citations>r(p90) & citations<. if half==1
+					bys scientist: egen top_0=total(toppapers)
+					drop toppapers
+				}
 			}
 			drop cit_*
 			replace citations=.a if age_paper==.a
-			capture drop p_* n_*
+			capture drop E_* p_* n_*
 			//calculate h
 			gsort scientist -citations paper_id
 			by scientist: g r=_n //order of papers by desc. no of citations
@@ -126,7 +196,7 @@ program h_index
 			g maxh=h_0 if alpha==1 & age_paper <.
 			replace maxh=h_0+runiformint(1,5) if maxh==. & age_paper<.
 			//clean up, save
-			drop r a number_cit core alpha_core
+			drop r a number_cit core alpha_core			
 			save `scient', replace
 			//now let scientists collaborate
 			forvalues year=1/`periods' {
@@ -134,33 +204,70 @@ program h_index
 				sum paper_id
 				local max_paper=r(max)
 				//one row per scientist
-				collapse h_0_std h_`prec_year' h_alpha_`prec_year', by(scientist)
+				if `inittype'==2 {
+					collapse pubprob h_0_std h_`prec_year' h_alpha_`prec_year', by(scientist)
+				}
+				else if `inittype'==1 {
+					collapse h_0_std h_`prec_year' h_alpha_`prec_year', by(scientist)
+				}
+				g half=0
+				replace half=1 if scientist>`subgroups'*_N
 				//select scientists who collaborate, see (1)
-				if `diligence_share'<1 {
+				if `inittype'==1 & `diligence_share'<1 {
 					g select_var=`diligence_corr'*h_0_std+sqrt(1-`diligence_corr'^2)*rnormal()
 					local diligence_share_100=100-(`diligence_share'*100)
 					centile select_var, centile(`diligence_share_100')
 					keep if select_var>r(c_1)
 					drop select_var
 				}
+				else if `inittype'==2 {
+					keep if pubprob>=runiform()
+				}
 				mark written //necessary for self citations
 				//number of teams depends on desired average team size
 				local number_of_teams=_N/(`coauthors')
-				//strategic selection of team members?
-				if "`strategic'" != "" {
-					gsort -h_`prec_year'
-					local number_of_teams_round=round(`number_of_teams')
-					g paper_id = _n in 1/`number_of_teams_round'
-					replace paper_id=runiformint(1,`number_of_teams') if paper_id==.
+				if `subgroups' == 1 { //one group contains 100% of agents, i.e. no subgroups
+					//strategic selection of team members?
+					if "`strategic'" != "" {
+						gsort -h_`prec_year'
+						local number_of_teams_round=round(`number_of_teams')
+						g paper_id = _n in 1/`number_of_teams_round'
+						replace paper_id=runiformint(1,`number_of_teams') if paper_id==.
+					}
+					else {
+						g paper_id=runiformint(1,`number_of_teams') //team-number
+					}
 				}
-				else {
-					g paper_id=runiformint(1,`number_of_teams') //team-number
-				}
+				else if `subgroups' != 1 { //two subgroups
+				recode half (0=1) (1=0) if runiform()<`exchange'
+					//strategic selection of team members?
+					if "`strategic'" != "" {
+						gsort half -h_`prec_year'
+						local number_of_teams_round_half_0= ///
+							round((`number_of_teams')*`subgroups')
+						local number_of_teams_round_half_1= ///
+							round((`number_of_teams')*(1-`subgroups'))
+						g paper_id = _n in 1/`number_of_teams_round_half_0'
+						replace paper_id=runiformint(1,`number_of_teams_round_half_0') ///
+							if half==0 & paper_id==.
+						sum paper_id
+						local lower=r(N)+1
+						local upper=r(N)+`number_of_teams_round_half_1'
+						replace paper_id=_n-r(N)+r(max) in `lower'/`upper'
+						replace paper_id=runiformint(`number_of_teams_round_half_0'+1,`number_of_teams') ///
+							if paper_id==.
+					}
+					else {	
+						g paper_id=runiformint(1,round(`number_of_teams'*`subgroups')) ///
+							if half==0 //team-number
+						replace paper_id=round(runiformint((round(`number_of_teams'*`subgroups')+1),`number_of_teams')) if half==1
+					}
+				}			
 				replace paper_id=paper_id+`max_paper'
 				//save collaboration, add new papers to scientists-file
 				save `publ', replace
 				use `scient', clear
-				append using `publ', keep(scientist paper_id written )
+				append using `publ', keep(scientist h_0_std paper_id written half)
 				replace age_paper=age_paper+1 if age_paper!=.a
 				replace age_paper=1 if age_paper==.
 				replace citations=0 if citations==.
@@ -171,25 +278,40 @@ program h_index
 				replace maxh=maxh2 if maxh==. & citations!=.a
 				replace alpha=h_`prec_year'==maxh if alpha==.
 				//new citations for papers
-				if (`d_citations'==1) {
-					replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
-						((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))) if age_paper!=.a
+				if (`d_citations'==1) { //poisson distribution of citations
+					if `subgroups' == 1 {
+						replace citations=citations+rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))) if age_paper!=.a
+					} 
+					else if `subgroups' != 1 {
+						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2)))) if age_paper!=.a  & half != 1
+						replace citations=citations+(rpoisson(`factor'*(((`speed'/`alpha')* ///
+							((age_paper/`alpha')^(`speed'-1)))/((1+(age_paper/`alpha')^`speed')^2))))*`advantage' if age_paper!=.a  & half == 1
+					}
 				}
-
-				else if (`d_citations'==3) {
-					g p=(`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
-						((1+(age_paper/`alpha')^`speed')^2)))/((`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
-						((1+(age_paper/`alpha')^`speed')^2)))*`dcd')
-					g n=((`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
-						((1+(age_paper/`alpha')^`speed')^2)))*p)/(1-p)
-					replace citations = citations+rnbinomial(n,p) if age_paper!=.a
-					drop p n
+				else if (`d_citations'==3) { //negative binomial distribution of citations
+					g E=(`factor'*(((`speed'/`alpha')*((age_paper/`alpha')^(`speed'-1)))/ ///
+						((1+(age_paper/`alpha')^`speed')^2)))
+					g p=E/(E*`dcd')
+					g n=(E*p)/(1-p)
+					if `subgroups' == 1 { //no subgroups
+						replace citations = citations+rnbinomial(n,p) if age_paper!=.a
+					}
+					//two subgroups, one of them with higher citation level 
+					//if advantage>1 specified
+					else if `subgroups' != 1 { 
+						replace citations = citations+rnbinomial(n,p) if age_paper!=.a & half != 1
+						replace citations = citations+rnbinomial(n,p)*`advantage' if age_paper!=.a & half == 1
+					}
 				}
 				sort paper_id, stable
 				by paper_id: replace citations=citations[1]
-				if "`boost'"!="" {
+				//matthew effect, papers from high-h-authors recieve additional citations
+				if "`boost'"!="" { 
 					replace citations=citations+round(maxh*`size') if citations<.
 				}
+				//self citation, agents cite own papers to boost their h index
 				if "`selfcitation'"!="" {
 					sort scientist written
 					by scientist: replace written=written[1]
@@ -199,6 +321,33 @@ program h_index
 					by paper_id: replace citations=citations[1]
 				}
 				drop written
+				capture drop E p n
+				//count top 10 papers
+				if "`toppapers'" != "" {
+					if `subgroups' == 1 { //no subgroups
+						preserve
+						collapse citations, by(paper_id)
+						sum citations, det
+						restore
+						g toppaper=citations>r(p90) & citations<.
+						bys scientist: egen top_`year'=total(toppaper)
+						drop toppaper
+					}
+					else if `subgroups' != 1 { //two subgroups
+						preserve
+						collapse half citations, by(paper_id)
+						sum citations if half==0, det
+						restore
+						g toppaper=cit>r(p90) & cit<. & half==0
+						preserve
+						collapse half citations, by(paper_id)
+						sum citations if half==1, det
+						restore
+						replace toppaper=1 if citations>r(p90) & citations<. & half==1
+						bys scientist: egen top_`year'=total(toppaper)
+						drop toppaper
+					}
+				}
 				//calculate new h-index
 				gsort scientist -citations paper_id
 				by scientist: g r=_n
@@ -211,8 +360,8 @@ program h_index
 				g alpha_core=alpha==1 & core==1
 				by scientist: egen h_alpha_`year'=total(alpha_core)
 				drop r a number_cit core alpha_core
-				if "`update'"!="" { //reset maxh and alpha to missing
-											//if alpha author is updated every period
+				//reset maxh and alpha to missing if alpha author is updated every period
+				if "`update'"!="" { 
 					replace maxh=. if h_alpha_0==.
 					replace alpha=. if h_alpha_0==.
 				}
@@ -244,7 +393,59 @@ program h_index
 		mata: st_store(.,names,final_data)
 		//one row per scientist
 		drop citations alpha h_0_std
-		collapse no_paper_start h_*, by(scientist run)
+		if `inittype'==1 {
+			if "`toppapers'" != "" collapse no_paper_start h_* top_*, by(scientist run)
+			else collapse no_paper_start h_*, by(scientist run)
+		}
+		else if `inittype'==2 {
+			if "`toppapers'" != "" collapse age_scientist_start=age_scientist ///
+				pubprob no_paper_start h_* top_*, by(scientist run)
+			else collapse age_scientist_start=age_scientist pubprob ///
+				no_paper_start h_* , by(scientist run)
+		}
+		//cumulate top papers over periods
+		if "`toppapers'" != "" {
+			forvalues p=1/`periods' {
+				local p0=`p'-1
+				replace top_`p'=top_`p'+top_`p0'
+			}
+			if `inittype'==2 {
+				//compute top papers age standardized
+				forvalues per=0/`periods' {
+					g top_`per'_std=top_`per'/(age_scientist_start+`per')
+				}
+			}
+		}
+		//compute m
+		if "`mindex'" != "" {
+			forvalues per=0/`periods' {
+				g m_`per'=h_`per'/(age_scientist_start+`per')
+			}
+		}
+		//drop h and/or h_alpha if not requested by user
+		if "`save_h'" == "" {
+			ren h_alpha_* alpha_*
+			drop h_*
+			ren alpha_* h_alpha_*
+		}
+		if "`save_alpha'" == "" drop h_alpha_*
+		if "`save_alpha'" != "" & `inittype' == 2 {
+			forvalues per=0/`periods' {
+				g h_alpha_std_`per'=h_alpha_`per'/(age_scientist_start+`per')
+			}
+		}
+		//order variables, remove labels
+		capture ren h_alpha_* alpha_*
+		capture order h_* alpha_*, after(no_paper_start)
+		capture ren alpha_* h_alpha_*
+		foreach var of varlist _all {
+			lab var `var' ""
+		}
+		//add variable indicating agent's subgroup
+		if `subgroups' != 1 {
+			g subgroup=1 if scientist <= `subgroups'*`n'
+			recode subgroup (.=2)
+		}
 		compress
 	}
 end
@@ -274,6 +475,31 @@ program subprog_distributions, sclass
 	sreturn local dispersion `dispersion'
 end
 
+program subprog_subgroups, sclass
+	syntax [anything] [, EXChange(real 0) ADVantage(real 1)]
+	if "`anything'" == "" local anything=1
+	sreturn local size `anything'
+	sreturn local exchange `exchange'
+	sreturn local advantage `advantage'
+end
+
+program subprog_init, sclass
+	syntax [anything] [, DPapers(string) MAXAge(integer 5) PRODuctivity(real 80)]
+	if "`dpapers'" != "" & "`anything'" == "2" {
+		di as err "Distribution of papers cannot be specified if init=2"
+		err 197
+	}
+	if "`anything'" == "" local anything=1
+	else if "`anything'" != "1" & "`anything'" != "2" {
+		di as err "Init must be 1 or 2"
+		err 197
+	}
+	sreturn local inittype `anything'
+	sreturn local dpapers "`dpapers'"
+	sreturn local maxage `maxage'
+	sreturn local productivity `productivity'
+end
+
 program subprog_diligence, sclass
 	syntax [, SHare(real 1) Correlation(real 0)]
 	if (`share'<0 | `share'>1 | `correlation'<0 | `correlation'>1) {
@@ -293,27 +519,73 @@ program subprog_plottimefunction
 	syntax anything(equalok) [, * ]
 	twoway function `anything', `options'
 end
-	
 
-//mata function for initial setup of scientists
+program subprog_generate, sclass
+	syntax [, TOPpapers M H HAlpha]
+	if "`toppapers'" == "" & "`m'" == "" & "`h'" == "" & "`halpha'" == "" {
+		local h="h"
+		local halpha="halpha"
+	}
+	sreturn local toppapers "`toppapers'"
+	sreturn local mindex "`m'"
+	sreturn local save_h "`h'"
+	sreturn local save_alpha "`halpha'"
+end	
+
+//mata functions for initial setup of scientists
+//function scientists: Agents have written k papers up to five periods ago
+//function scientists2: Agents started to publish k periods ago
 version 15.1
 mata:
 void function scientists(real scalar n, real scalar d_papers, real scalar mdp,
-	real scalar dpn, real scalar dpp, real scalar salpha)
+	real scalar dpn, real scalar dpp, real scalar sgr)
 {
-	//create N scientists, random number of papers per scientist, number scientists
-	if (d_papers==1) { //poisson distribution
-		S=J(1,1,1::n),rpoisson(n,1,mdp)
+	//create N scientists and number them
+	S=J(1,1,1::n),J(n,1,0)
+	//create subgroups
+	if (sgr<1) {
+		S[|round(rows(S)*(sgr))+1,2 \ rows(S),2|]=J(round(rows(S)*(1-sgr)),1,1)
 	}
-	else if (d_papers==3) { //negative binomial distribution
-		S=J(1,1,1::n),rnbinomial(n,1,dpn,dpp)
+	//random number of papers per scientist
+	if (d_papers==1) {
+		P=rpoisson(n,1,mdp) //poisson distribution
 	}
+	else if (d_papers==3) {
+		P=rnbinomial(n,1,dpn,dpp) //negative binomial distribution
+	}
+	S=S,P,J(rows(S),2,.)
 	//expand scientists by their number of papers
-	_mm_expand(S,S[.,2],1,1)
-	//paper id ,random age of papers, alpha papers
-	S=S,J(1,1,1::rows(S)),runiformint(rows(S),1,1,5),(runiform(rows(S),1):<salpha)
+	_mm_expand(S,P,1,1)
+	//paper id, random age of papers
+	for (i=1; i<=rows(S); ++i) {
+		S[i,(cols(S)-1)]=i
+		S[i,cols(S)]=runiformint(1,1,1,5)
+	}
 	//put to stata
-	st_addvar("float", ("scientist","no_paper_start","paper_id","age_paper","alpha"))
+	st_addvar("float", ("scientist","half","no_paper_start","paper_id","age_paper"))
+	st_addobs(rows(S))
+	st_store(.,.,S)
+}
+
+void function scientists2(real scalar n, real scalar max_age_scientists,
+	real scalar sgr, real scalar prod){
+	//create N scientists with random age
+	S=J(1,1,1::n),J(n,1,0),runiformint(n,1,1,max_age_scientists),runiform(n,1):^prod,J(n,1,1) 
+	//create subgroups
+	if (sgr<1) {
+		S[|round(rows(S)*sgr)+1,2 \ rows(S),2|]=J(round(rows(S)*(1-sgr)),1,1)
+	}
+	//expand scientists by time since active in science
+	_mm_expand(S,S[.,3],1,1)
+	//number periods
+	for (i=2; i<=rows(S); i++) {
+		if (S[i,1]==S[(i-1),1]) S[i,5]=S[(i-1),5]+1
+	}
+	//create dummy indicating if agent published in respective period
+	S=S,(S[.,4]:>=runiform(rows(S),1))
+	st_addvar("float", ("scientist","half","age_scientist","pubprob","age_paper","written"))
+	//variables: agent id, subgroup, age of each agent, probability of publishing, period id,
+	//dummy: agent published
 	st_addobs(rows(S))
 	st_store(.,.,S)
 }
@@ -326,6 +598,4 @@ end
 
 (2) https://www.statalist.org/forums/forum/general-stata-discussion/general/
 1315697-syntax-for-options-within-options
-
-
 
