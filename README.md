@@ -1,7 +1,7 @@
 # h_index
 This is an ado for Stata, a statistics/data analysis software.
 
-The ado simulates scientists who collaborate on writing papers. You can simulate the effect of publishing, being cited, and strategic collaborating on the development of h-index and h-alpha values (as proposed by Hirsch) for a specified set of agents.
+The ado Simulate the effect of publishing, being cited, and (strategic) collaboration on the development of the h-index and other bibliometric indicators (h-alpha, m-index, number of highly-cited papers) for a specified set of agents.
 
 In Stata, type 
 
