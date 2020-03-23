@@ -1,4 +1,4 @@
-program h_index_dev
+program h_index
 	version 15.1
 	syntax [, Runs(integer 1) 			/// repeat simulation r times
 		n(integer 100) 					/// number of scientists
